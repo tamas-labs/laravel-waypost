@@ -6,11 +6,21 @@ return [
 
     /*
     | HTTP API. Every endpoint lives under this prefix; the middleware runs before the package's own
-    | middleware (authentication, schema validation, idempotency).
+    | middleware (authentication, throttling, idempotency, schema validation). Errors of every request under
+    | the prefix, also of an unknown endpoint, are answered in the API's error format.
     */
     'route' => [
         'prefix' => env('WAYPOST_ROUTE_PREFIX', 'api/waypost/v1'),
         'middleware' => ['api'],
+    ],
+
+    /*
+    | Rate limits of the API, in requests per minute: "api" per token owner (user or device), "login" per
+    | e-mail address and IP address. Above the limit: 429 rate_limited with a Retry-After header.
+    */
+    'rate_limits' => [
+        'api' => (int) env('WAYPOST_RATE_LIMIT', 240),
+        'login' => (int) env('WAYPOST_LOGIN_RATE_LIMIT', 5),
     ],
 
     /*

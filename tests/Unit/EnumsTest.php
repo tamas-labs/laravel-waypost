@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Waypost\Enums\ChainEntryType;
+use Waypost\Enums\ErrorCode;
 use Waypost\Enums\IncidentCategory;
 use Waypost\Enums\OrderMode;
 use Waypost\Enums\Platform;
@@ -54,4 +55,15 @@ it('has the values of the schema', function (string $enum, string $schema, strin
 
 it('has every final round status of round_closed', function (): void {
     expect(enumValues(RoundStatus::class))->toContain(...schemaEnum('chain/payload-round_closed', 'status'));
+});
+
+it('has the error codes of the schema', function (): void {
+    expect(enumValues(ErrorCode::class))->toBe(schema('common/error-code')['enum']);
+});
+
+it('gives every request-level error code the status of the specification', function (): void {
+    expect(array_map(fn (ErrorCode $code): int => $code->status(), [
+        ErrorCode::Unauthenticated, ErrorCode::DeviceRevoked, ErrorCode::Forbidden, ErrorCode::NotFound,
+        ErrorCode::ValidationFailed, ErrorCode::Conflict, ErrorCode::RateLimited,
+    ]))->toBe([401, 401, 403, 404, 422, 409, 429]);
 });

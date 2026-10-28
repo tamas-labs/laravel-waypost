@@ -15,7 +15,7 @@ A Waypost backendje Laravel 13 csomagként (`waypost/laravel-waypost`): migráci
 config/waypost.php      # route prefix és middleware, tábla-előtag, storage disk, queue, mail feladó
 database/migrations/    # a csomag táblái; publikálja (waypost-migrations tag), nem tölti be
 database/factories/     # Waypost\Database\Factories\ – minden modellhez (a modelleken #[UseFactory])
-routes/api.php          # (M2-10-től)
+routes/api.php          # az API útvonalai (WaypostServiceProvider::apiRoutes() tölti be)
 src/
   WaypostServiceProvider.php
   Models/               # Model (alaposztály) és a táblák modelljei; PersonalAccessToken (saját Sanctum-tokentábla)
@@ -25,9 +25,14 @@ src/
   Console/              # waypost:install, waypost:create-supervisor
   Pin/                  # PinHasher (PBKDF2, generálás), PinHash, SitePins (egyediség telephelyen belül)
   Support/              # Table (tábla-előtag), Uuid (UUIDv7), Time (UTC, ISO 8601 ezredmásodperccel)
-  Http/ Policies/ Chain/ Schedule/ Reports/ Jobs/ Mail/   # a későbbi feladatokban
+  Auth/                 # TokenGuard ("waypost" guard), Caller (a kérés hívója), Gate + Policies/ (a csomag saját gate-je)
+  Http/                 # ErrorRenderer (hibaformátum), Exceptions/ApiException, Middleware/, Controllers/
+    Middleware/         # FormatApiResponse, Authenticate, HandleIdempotencyKey, ValidateSchema
+  Validation/           # SchemaValidator (opis/json-schema, magyar üzenetek mezőnként)
+  Jobs/                 # PruneIdempotencyKeys (óránként ütemezve)
+  Chain/ Schedule/ Reports/ Mail/   # a későbbi feladatokban
 resources/views/        # e-mail és PDF sablonok (M6)
-tests/                  # Pest: Unit/, Feature/, Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand()
+tests/                  # Pest: Unit/, Feature/ (Api/: az API-keret), Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand(), toMatchSchema(), supervisorToken(), deviceToken(), supervisorOf()
   Install/              # InstallTestCase: workbench nélküli alkalmazás, mint a composer require után
 scripts/install-smoke.sh  # telepítés egy friss laravel/laravel 13-ba (Docker, hálózat kell)
 workbench/              # Testbench workbench: routes/web.php (állapotoldal), database/seeders (demóadat)
@@ -48,6 +53,7 @@ A gyökérnévtér `Waypost\` (`src/`), és a sémacsomagé `Waypost\Schema\` �
 - Szinkronizált tábla (saját ID-val): `datetimes(3)` + `softDeletesDatetime` + `index(['updated_at', 'id'])` (pull kurzor, Q3). Egyedi index soft delete mellett: a `not_deleted` generált oszloppal (`case when deleted_at is null then 1 end`, lásd `users`), a modellben `$guarded` és `$hidden`. Ütközés várható helyen (409) savepointban próbálkozz (`DB::transaction()`), mert PostgreSQL-en a hibás utasítás az egész tranzakciót megszakítja.
 - Felsorolás: `string` oszlop, nem DB-`enum`; a modell egy `src/Enums` backed enumra castol, amelynek értékeit a `tests/Unit/EnumsTest.php` a sémával veti össze. Új migráció új táblája a `tests/Pest.php` `WAYPOST_TABLES` listájába is kerüljön.
 - PIN: a kódban csak a `Waypost\Pin\PinHasher`-rel (nem közvetlen `hash_pbkdf2`; teszt független ellenőrzésként számolhat így), az egyediség a `SitePins`-szel; a paramétereket a `waypost-schema` `pin/test-vectors.json`-ja rögzíti. E-mail-cím: a `User` kisbetűsen tárolja, keresni is kisbetűsítve kell.
+- API-útvonal: a `routes/api.php`-ba, middleware-sorrend: `Authenticate::using(...)` (`supervisor` / `device` / `acting`), `ThrottleRequests::using('waypost')`, író kérésnél `HandleIdempotencyKey`, törzzsel `ValidateSchema::using('api/…request')`. A hibát `ApiException` (vagy Laravel-kivétel) jelzi, a választ az `ErrorRenderer` formázza; a controller tömböt ad vissza `server_time` nélkül (az `FormatApiResponse` teszi bele). Jogosultság: a csomag `Waypost\Auth\Gate`-je a `Caller`-rel (nem a gazda `Gate` facade-ja), a policy-k a `src/Auth/Policies` alatt; a telephelyszűrés a `Caller::siteIds()` szerint. A válasz tesztje: `expect($response)->toMatchSchema('api/…')`; próba-útvonal: `WaypostServiceProvider::apiRoutes(fn () => …)`.
 - Artisan-parancs kimenete magyar; a `$this->components->info()` pontot tesz a végére, ezért parancsjavaslattal ne végződjön az üzenet. A tesztben `artisanCommand()` (a `Pest\Laravel\artisan()` típusa `PendingCommand|int`).
 - Lebegőpontos szám a láncolt adatban sehol; a koordináta `lat_e7` / `lng_e7`, a pontosság `accuracy_dm` (egészek).
 - A bemenő JSON-t a `waypost/schema` sémái ellenőrzik (opis/json-schema), a FormRequest csak az adatbázisfüggő szabályokat nézi. Ha egy sémamintát PHP-ban is használunk, a PCRE-be `D` módosítóval kerül (`/…$/D`), különben a `$` a záró sortörés előtt is illeszkedik; a teszt a sémafájlból olvasott mintával veti össze (`schemaPattern()`).
@@ -64,7 +70,7 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm php composer analyse` – PHPStan.
 - `docker compose run --rm php composer lint` – Pint ellenőrzés; `composer format` – javítás.
 - PostgreSQL 16-on: `docker compose --profile pgsql up -d --wait pgsql`, majd `docker compose run --rm -e DB_CONNECTION=pgsql -e DB_HOST=pgsql -e DB_PORT=5432 php composer test`. Migrációt vagy nyers lekérdezést érintő változásnál futtasd.
-- `docker compose run --rm php sh scripts/install-smoke.sh` – a csomag telepítése egy friss Laravel 13 alkalmazásba (`composer require`, `waypost:install --migrate`, `waypost:create-supervisor`, SQLite). A telepítést vagy a csomag függőségeit érintő változásnál futtasd.
+- `docker compose run --rm php sh scripts/install-smoke.sh` – a csomag telepítése egy friss Laravel 13 alkalmazásba (`composer require`, `waypost:install --migrate`, `waypost:create-supervisor`, belépés az alkalmazás HTTP-kernelén át, SQLite). A telepítést, a service providert vagy a csomag függőségeit érintő változásnál futtasd: a gazda valódi exception handlerét csak ez próbálja ki.
 - `docker compose run --rm php composer build` – a workbench adatbázisának újraépítése (wipe + migrate + demó-seeder). `composer seed` – csak a seeder (üres, migrált adatbázison). A demó belépési adatai a `workbench/database/seeders/DatabaseSeeder.php` konstansaiban.
 - `docker compose run --rm --service-ports php composer serve` – build, majd a workbench a `http://localhost:8088` címen (`WAYPOST_PORT` felülírja; a 8000 a hoston foglalt).
 - `docker compose run --rm php vendor/bin/testbench <artisan parancs>` – artisan a workbench alkalmazásban.

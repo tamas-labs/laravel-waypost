@@ -164,3 +164,67 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - Ismert korlát: egy meglévő, PIN-nel rendelkező felhasználó új telephelyhez rendelésekor a szerver nem tudja ellenőrizni az ütközést, mert csak a hasht ismeri. **Az M2-16-ban dönteni kell:** a hozzárendeléskor PIN-t kér (vagy generál), vagy elfogadja a kockázatot. Javaslat: ha a felhasználónak van PIN-je, a hozzárendelés új PIN-t generál, és egyszer visszaadja.
 - **Indok:** Az app ugyanezt a PBKDF2-t számolja offline, ezért mindkét oldal ugyanazokkal a vektorokkal tesztel; ha bármelyik paraméter vagy kódolás eltér, a teszt bukik, nem a belépés a terepen. A véletlenforrás cserélhető, így a tesztben az ütközés és a kimerülés is előidézhető.
 - **Érintett:** `src/Pin/`, `database/factories/UserFactory.php`, M2-09, M2-16, M2-17, M3-15, Q11.
+
+## 2026-10-28 – Az API-keret: útvonalak, hibaformátum, `server_time`, rate limit
+
+- **Kérdés:** Hogyan kerül a csomag API-ja a gazda-alkalmazásba úgy, hogy minden válasz a sémák szerinti legyen, a gazda saját hibakezelése pedig ne változzon?
+- **Döntés:**
+  - Útvonalak: `routes/api.php`, a `WaypostServiceProvider::apiRoutes()` tölti be (`waypost.route.prefix` alatt, `waypost.` névelőtaggal, a `waypost.route.middleware`-rel), ha a gazda nem cache-eli az útvonalakat. A tesztek ugyanezzel regisztrálnak próba-útvonalakat.
+  - Hibaformátum: a `Waypost\Http\ErrorRenderer` csak az előtag alatti kérések hibáit formázza, két helyen. A csomag útvonalain a legkülső middleware (`FormatApiResponse`) a gazda handlere által renderelt választ cseréli le (a Laravel a kivételt a válaszon hagyja), így a gazda handlerétől függetlenül működik. Ami útvonalon kívül történik (nincs ilyen végpont, rossz kérésmód, karbantartás, a gazda globális middleware-je), azt a gazda handlerének egy render-callbackje formázza, ha az a Laravel szokásos `Handler`-e. Leképezés: `AuthenticationException` → `unauthenticated`; a policy-elutasítás → `forbidden`, vagy `not_found`, ha a policy így tagad; hiányzó modell → `not_found`; `ValidationException` → `validation_failed` a Laravel `errors()` alakjával mint `details`; `UniqueConstraintViolationException` → `conflict`; throttling → `rate_limited` a `Retry-After` fejléccel; minden más 4xx → `bad_request`, 5xx → `server_error` (a HTTP-státusz marad, a két új kód a `waypost-schema` döntése szerint); bármi más → `server_error` (500). A saját hibák `Waypost\Http\Exceptions\ApiException`-ök (kód, magyar üzenet, `details`); HTTP-kivételek, ezért a gazda nem naplózza őket. Az üzenet mindig a kód magyar alapszövege vagy az `ApiException`-é, a kivétel szövege soha (debug módban sem).
+  - `server_time`: ugyanez a `FormatApiResponse` minden JSON-objektum válasz elejére beteszi a mostani időt, a már ott lévőt felülírva; a renderelő a csoporton kívüli hibákba maga teszi bele. A `[]`-t visszaadó controller válasza `{ "server_time": … }`.
+  - Rate limit: `throttle` két névvel. `waypost`: percenként `waypost.rate_limits.api` (240) kérés a token gazdájára (felhasználó vagy eszköz), token nélkül az IP-re; az `Authenticate` után fut. `waypost-login`: percenként `waypost.rate_limits.login` (5) belépési kísérlet e-mail-cím és IP párosra.
+- **Indok:** A gazda handlerét lecserélni vagy a `bootstrap/app.php`-ját módosítatni nem lehet egy csomagtól, és a csak callbackre épülő megoldás nem elég: a `scripts/install-smoke.sh` egy friss `laravel/laravel` 13-ban megmutatta, hogy parancssorból (és minden más handler-dekorátorral) a Collision becsomagolja a handlert, és a callback nem kerül fel. A middleware és a callback is csak a saját előtagot érinti, a gazda többi útvonala a megszokott választ kapja. Az útvonalon kívüli hibáknál, ha a gazda handlere nem a Laravelé, vagy a gazda előbb fut le egy saját callbackje ugyanarra a kivételre, a válasz a gazdáé marad – ezt a telepítési leírásban jelezni kell (M7-01). A 240/perc bőven elég egy eszköznek (pull-lapozás, média-feltöltés egy offline éjszaka után), egy elszabadult kliens viszont nem terheli le a szervert.
+- **Érintett:** `routes/api.php`, `src/WaypostServiceProvider.php`, `src/Http/ErrorRenderer.php`, `src/Http/Exceptions/ApiException.php`, `src/Http/Middleware/FormatApiResponse.php`, `scripts/install-smoke.sh`, `src/Enums/ErrorCode.php`, `config/waypost.php`, M2-10, M7-01.
+
+## 2026-10-28 – Sémaellenőrzés (M2-11)
+
+- **Kérdés:** Hol és hogyan ellenőrzi a backend a bemenő JSON-t a `waypost/schema` sémáival, és milyen hibát ad?
+- **Döntés:**
+  - `ValidateSchema::using('api/…request')` útvonal-middleware, a FormRequest előtt. A törzsnek JSON-objektumnak kell lennie (`Content-Type: application/json`); ha nem az, vagy nem érvényes JSON, `validation_failed` `details` nélkül. A séma szerinti hibák `details`-ként: kulcs a mező pontokkal elválasztott útvonala, a hiányzó és az ismeretlen mező a saját útvonalán (`entries.0.hash`), az üzenet magyar, kulcsszavanként (`Kötelező mező.`, `Ismeretlen mező.`, `Hibás típus, egész szám kell.` …). Egy nullázható mező hibájánál a „null kell” ág üzenete elmarad.
+  - A validátor (`Waypost\Validation\SchemaValidator`, opis/json-schema, legfeljebb 100 hiba) a sémákat a `Paths::SCHEMA_ID_BASE` előtagról tölti be. Az opis egy objektumban az első hibás kulcsszócsoport után a feltételes ágakat (pl. a bejegyzés payloadját) nem mindig nézi meg; ilyenkor a kliens a javítás után kapja a többi hibát.
+  - Az ellenőrzött törzs lesz a kérés JSON-bemenete (`json()` és `request`), így a controller pontosan azt kapja, amit a séma elfogadott: a gazda `TrimStrings` és `ConvertEmptyStringsToNull` middleware-je nem változtat rajta.
+  - Tesztben: `expect($response)->toMatchSchema('api/…')` (`tests/Pest.php`); a hibaüzenet az opis JSON-pointeres listája.
+- **Indok:** A specifikáció szerint a séma a szerződés, a FormRequest csak az adatbázisfüggő szabályokat nézi; ha a gazda middleware-je a már ellenőrzött értéket módosítaná (üres szöveg → `null`), a controller a sémának ellentmondó adatot kapna.
+- **Következmény az M2-16-tól:** a FormRequestek üzenetei a gazda nyelvi fájljaiból jönnének (alapból angolul); a csomag FormRequest-alaposztálya ezért saját magyar üzeneteket ad a használt szabályokra (`exists`, `unique` …).
+- **Érintett:** `src/Http/Middleware/ValidateSchema.php`, `src/Validation/SchemaValidator.php`, `tests/Pest.php`, M2-11, M2-16 – M2-23.
+
+## 2026-10-28 – `Idempotency-Key` (M2-12)
+
+- **Kérdés:** Pontosan mikor kötelező a fejléc, mit tárol a szerver, és mi történik eltérő vagy egyidejű ismétlésnél?
+- **Döntés:**
+  - A `HandleIdempotencyKey` middleware minden azonosított író útvonalon fut (az `Authenticate` és a throttling után, a sémaellenőrzés előtt). A fejléc UUID (bármely verzió, kis- és nagybetűtől függetlenül); hiányzó vagy hibás fejléc: `validation_failed`, `details`: `{"Idempotency-Key": [...]}`.
+  - A kulcs a token gazdájáé (felhasználó vagy eszköz; az `X-Acting-User`-rel küldött kérés az eszközé). Lenyomat: SHA-256 a módszerből, az útvonalból, a query stringből és a törzsből; multipart törzsnél a mezőkből és a fájlok tartalmának SHA-256-jából, mert a boundary próbálkozásonként más.
+  - Ugyanarra a kulcsra 24 órán át ugyanaz a válasz jön (státusz és törzs, `Idempotent-Replayed: true` fejléccel), a kérés nem fut újra; a `server_time` viszont mindig a mostani, mert az app abból becsli a megbízható időt. Kliensoldali hiba (4xx) is tárolódik, szerverhiba (5xx) nem: azt ugyanazzal a kulccsal újra lehet próbálni.
+  - Ugyanaz a kulcs más kéréssel: `validation_failed`. Ugyanaz a kulcs, amíg az első kérés fut: `conflict` (409). A lejárt kulcs úgy számít, mintha nem lenne.
+  - Takarítás: a `PruneIdempotencyKeys` job (a `waypost.queue` szerinti sorban) óránként törli a lejártakat; a csomag a gazda ütemezőjébe regisztrálja (`waypost:prune-idempotency-keys`), ehhez a gazdának a `schedule:run`-t futtatnia kell.
+  - A `POST /auth/login` és a `POST /auth/logout` kivétel: a login előtt nincs hívó, akihez a kulcs tartozna, és az ismételt login csak egy újabb tokent ad; az ismételt logout `unauthenticated`-et kap, ami ugyanazt jelenti.
+- **Indok:** A specifikáció szerint ugyanarra a kulcsra ugyanaz a válasz jár; a régi `server_time` visszajátszása viszont elrontaná az app időbecslését. A futó kérés jelölése (Q4) kezeli az egyidejű ismétlést.
+- **Érintett:** `src/Http/Middleware/HandleIdempotencyKey.php`, `src/Jobs/PruneIdempotencyKeys.php`, `src/WaypostServiceProvider.php`, M2-12, M3, M4, M5.
+
+## 2026-10-28 – Azonosítás: guard, hívó, `X-Acting-User` (M2-13)
+
+- **Kérdés:** Hogyan azonosítja a csomag a kéréseket a saját tokentáblájából (Q8), és hogyan érvényesül az `X-Acting-User` telephelyi korlátja?
+- **Döntés:**
+  - `waypost` guard (`Waypost\Auth\TokenGuard`, az `auth.guards.waypost` konfigurációt a csomag adja hozzá): a Bearer token `id|titok` alakú; a nem UUIDv7 ID-t lekérdezés nélkül elutasítja (PostgreSQL-en a `uuid` oszlop hibát dobna). Érvényes a token, ha nem járt le (`expires_at`, ha van), és a gazdája létezik: felhasználónál csak aktív supervisor; az eszköz visszavonva is (a middleware dönt). A gazda `sanctum.expiration` beállítása nem számít. Az eredmény a kérésen tárolódik, nem a guardon. A gazda alapértelmezett guardja nem változik.
+  - Az `Authenticate::using(...)` middleware paraméterei a route által elfogadott hívók: `supervisor` (supervisor token), `device` (eszköztoken `X-Acting-User` nélkül), `acting` (eszköztoken + `X-Acting-User`). Sorrend: nincs érvényes token → `unauthenticated`; visszavont eszköz → `device_revoked` minden útvonalon; a route nem fogadja el a tokent, a token képessége nem a gazdájáé, vagy `X-Acting-User` jött supervisor tokennel vagy olyan route-on, amely nem fogad el `acting`-et → `forbidden`. Az `X-Acting-User` egy aktív supervisor ID-ja, aki az eszköz telephelyéhez van rendelve; ha nem az, `forbidden`.
+  - A hívó a `Waypost\Auth\Caller` (supervisor, eszköz, vagy eszköz + supervisor), a kérés attribútuma; controllerbe injektálható. `siteIds()`: a supervisor összes telephelye, az eszköz és a nevében eljáró supervisor esetén csak az eszköz telephelye. A `$request->user()` a token gazdája (a rate limit és az idempotenciakulcs ehhez tartozik).
+  - A visszavont eszköz egyetlen engedett végpontja (`POST /sync/push-final`, M4) egy további paraméterrel kerül majd be.
+- **Indok:** A Laravel `RequestGuard`-ja a guardpéldányon tárolja a felhasználót, ami hosszú életű folyamatban (és a tesztekben) a következő kérésre is átragadna. A telephelyi korlátot a `Caller` hordozza, így minden policy és lekérdezés ugyanabból a listából dolgozik.
+- **Érintett:** `src/Auth/TokenGuard.php`, `src/Auth/Caller.php`, `src/Http/Middleware/Authenticate.php`, `src/Models/PersonalAccessToken.php`, M2-13, M2-22, M4 (push-final), M5.
+
+## 2026-10-28 – Belépés és kijelentkezés (M2-14)
+
+- **Kérdés:** Mit ellenőriz a `POST /auth/login`, és mit ad vissza hibánál?
+- **Döntés:** A beírt címet kisbetűsítve keresi (a `User` kisbetűsen tárolja). Csak supervisor léphet be jelszóval; ismeretlen cím, őr és hibás jelszó ugyanazt kapja: `unauthenticated`, „Hibás e-mail-cím vagy jelszó.”. Inaktív supervisor helyes jelszóval: `unauthenticated`, „Ez a fiók inaktív, nem lehet vele belépni.”. A token `supervisor` képességű, nem jár le, a neve a `device_name`. A `POST /auth/logout` a kérés tokenjét törli, a supervisor többi tokenje marad; eszköztokennel `forbidden`.
+- **Indok:** A séma (`api/auth-login.response`) szerint a hibás belépés `401 unauthenticated`. Az inaktív fiók külön üzenete csak helyes jelszó után jelenik meg, így nem árulja el, hogy a cím létezik.
+- **Érintett:** `src/Http/Controllers/AuthController.php`, `routes/api.php`, M2-14.
+
+## 2026-10-28 – Policy-k (M2-15)
+
+- **Kérdés:** Hogyan érvényesül, hogy a supervisor csak a hozzárendelt telephelyeit és azok entitásait látja, és mit kap egy idegen telephelyre?
+- **Döntés:**
+  - A csomagnak saját gate-je van (`Waypost\Auth\Gate`), a policy-k a `Caller`-t kapják, nem felhasználót. A policy-k a `Waypost\Auth\Policies` névtérben vannak, mert a gazda gate-je a `Waypost\Policies\…Policy` nevet a modellek mellett magától megtalálná.
+  - Szabályok: csak supervisor (saját tokennel vagy `X-Acting-User`-rel) konfigurál, a telephelyi telefon önmagában semmit (403). Telephely: a hozzárendeltek; újat csak saját tokennel lehet létrehozni. Pont, útvonal (és verziói), előfizetés: a telephelyük szerint; menetrend: az útvonala telephelye szerint. Felhasználó: aki legalább egy telephelyen osztozik a hívóval, és saját maga; saját magát senki nem törölheti.
+  - Idegen telephely rekordja: `not_found` (404, `Response::denyAsNotFound()`), hogy a létezése ne derüljön ki; létrehozás idegen telephelyen: `forbidden` (403).
+- **Indok:** A gazda gate-jének `before` callbackjei a saját felhasználói típusára vannak írva, és egy `Caller`-rel hibát dobnának; a különálló gate-tel a két oldal nem lát bele egymás döntéseibe. A 404 a specifikáció „csak azokat látja” szabályának pontosabb megfelelője, mint a 403.
+- **Érintett:** `src/Auth/Gate.php`, `src/Auth/Policies/`, `src/WaypostServiceProvider.php`, M2-15 – M2-21.

@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\PendingCommand;
+use Illuminate\Testing\TestResponse;
+use Opis\JsonSchema\Errors\ErrorFormatter;
+use Waypost\Http\Middleware\Authenticate;
+use Waypost\Models\Device;
+use Waypost\Models\Site;
+use Waypost\Models\User;
 use Waypost\Schema\Paths;
 use Waypost\Tests\InstallTestCase;
 use Waypost\Tests\TestCase;
+use Waypost\Validation\SchemaValidator;
 
 use function Pest\Laravel\artisan;
 
@@ -66,4 +73,41 @@ function artisanCommand(string $command, array $parameters = []): PendingCommand
     assert($pending instanceof PendingCommand);
 
     return $pending;
+}
+
+/*
+ * expect($response)->toMatchSchema('api/auth-login.response'): the JSON body of a TestResponse is valid against a
+ * schema of waypost/schema. The failure lists opis/json-schema's errors by JSON pointer.
+ */
+expect()->extend('toMatchSchema', function (string $name) {
+    $response = $this->value;
+    assert($response instanceof TestResponse);
+    $content = (string) $response->getContent();
+    $error = app(SchemaValidator::class)->validate(json_decode($content, flags: JSON_THROW_ON_ERROR), $name);
+    $errors = $error === null ? [] : (new ErrorFormatter())->format($error);
+
+    expect($errors)->toBe([], "The response does not match {$name}: " . json_encode($errors, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n{$content}");
+
+    return $this;
+});
+
+/** The bearer token of a supervisor, as POST /auth/login issues it. */
+function supervisorToken(User $user): string
+{
+    return $user->createToken('test', [Authenticate::SUPERVISOR])->plainTextToken;
+}
+
+/** The bearer token of a site phone, as POST /devices/enroll issues it. */
+function deviceToken(Device $device): string
+{
+    return $device->createToken('test', [Authenticate::DEVICE])->plainTextToken;
+}
+
+/** A supervisor assigned to the sites. */
+function supervisorOf(Site ...$sites): User
+{
+    $user = User::factory()->supervisor()->create();
+    $user->sites()->attach(array_map(fn (Site $site): string => $site->id, $sites));
+
+    return $user;
 }

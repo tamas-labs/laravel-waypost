@@ -17,3 +17,8 @@ parameters:
         -
             identifier: larastan.noEnvCallsOutsideOfConfig
             path: config/waypost.php
+        # A custom expectation of tests/Pest.php (expect()->extend()), registered at run time.
+        -
+            identifier: method.notFound
+            message: '#^Call to an undefined method Pest\\Expectation<.+>::toMatchSchema\(\)\.$#'
+            path: tests/*
