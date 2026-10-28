@@ -6,25 +6,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Waypost\Support\Table;
 
-/** The package's tables without prefix. */
-const WAYPOST_TABLES = [
-    'users', 'personal_access_tokens', 'sites', 'site_user', 'devices', 'checkpoints', 'routes',
-    'route_versions', 'route_version_checkpoints', 'schedules', 'report_subscriptions',
-    'chain_entries', 'shifts', 'rounds', 'scans', 'incidents', 'media', 'reports', 'idempotency_keys',
-];
-
-/**
- * Tables of the test database (not of the server: the workbench database is there too).
- *
- * @return list<string>
- */
-function tablesWithPrefix(string $prefix): array
-{
-    $tables = Schema::getTableListing(Schema::getCurrentSchemaListing(), schemaQualified: false);
-
-    return array_values(array_filter($tables, fn (string $name): bool => str_starts_with($name, $prefix)));
-}
-
 it('creates every table with the prefix next to the host application\'s own tables', function (): void {
     expect(Artisan::call('migrate:fresh'))->toBe(0);
 

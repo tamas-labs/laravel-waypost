@@ -12,6 +12,8 @@ use Waypost\Models\Route;
 use Waypost\Models\Schedule;
 use Waypost\Models\Site;
 use Waypost\Models\User;
+use Waypost\Pin\PinHash;
+use Waypost\Pin\PinHasher;
 use Workbench\Database\Seeders\DatabaseSeeder;
 
 use function Pest\Laravel\seed;
@@ -20,9 +22,9 @@ pest()->use(RefreshDatabase::class);
 
 function pinMatches(User $user, string $pin): bool
 {
-    $hash = hash_pbkdf2('sha256', $pin, (string) base64_decode((string) $user->pin_salt), max(1, (int) $user->pin_iterations), 32, true);
+    $hash = PinHash::of($user);
 
-    return hash_equals((string) $user->pin_hash, base64_encode($hash));
+    return $hash !== null && app(PinHasher::class)->check($pin, $hash);
 }
 
 it('seeds the demo site', function (): void {

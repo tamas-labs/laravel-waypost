@@ -22,10 +22,14 @@ src/
     Concerns/           # HasPrefixedTable, HasUuidV7PrimaryKey, StoresUtcMilliseconds, HasWaypostTokens
   Enums/                # a felsorolások (Role, TagType, ChainEntryType …) – az értékek a sémákéi
   Casts/                # LocalTime (HH:MM ↔ time oszlop)
+  Console/              # waypost:install, waypost:create-supervisor
+  Pin/                  # PinHasher (PBKDF2, generálás), PinHash, SitePins (egyediség telephelyen belül)
   Support/              # Table (tábla-előtag), Uuid (UUIDv7), Time (UTC, ISO 8601 ezredmásodperccel)
-  Http/ Policies/ Chain/ Schedule/ Reports/ Jobs/ Mail/ Console/   # a későbbi feladatokban
+  Http/ Policies/ Chain/ Schedule/ Reports/ Jobs/ Mail/   # a későbbi feladatokban
 resources/views/        # e-mail és PDF sablonok (M6)
-tests/                  # Pest: Unit/, Feature/, Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern()
+tests/                  # Pest: Unit/, Feature/, Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand()
+  Install/              # InstallTestCase: workbench nélküli alkalmazás, mint a composer require után
+scripts/install-smoke.sh  # telepítés egy friss laravel/laravel 13-ba (Docker, hálózat kell)
 workbench/              # Testbench workbench: routes/web.php (állapotoldal), database/seeders (demóadat)
 testbench.yaml          # a workbench alkalmazás: env (MySQL), provider, migrációk, build lépések
 docker/ compose.yaml    # fejlesztői környezet: PHP 8.4 + MySQL 8.4 (+ PostgreSQL 16 a pgsql profillal)
@@ -42,7 +46,9 @@ A gyökérnévtér `Waypost\` (`src/`), és a sémacsomagé `Waypost\Schema\` �
 - Elsődleges kulcs: UUIDv7, kisbetűs kanonikus alak (`Uuid::v7()`, `Uuid::isV7()`); a kliens által adott ID-t a modell megtartja. Migrációban `$table->uuid('id')->primary()`, idegen kulcs `foreignUuid()`.
 - Idő: az adatbázisban UTC, `datetime(3)`: `$table->dateTime('x', 3)`, `$table->datetimes(3)`, `$table->softDeletesDatetime(precision: 3)`. **Nem** `timestamps()` / `softDeletes()` / `timestamp()`: a MySQL `timestamp` a kapcsolat időzónájával alakít (a migrációs teszt ellenőrzi). A gazda-alkalmazás időzónája nem számít: a modell UTC-be alakít íráskor és UTC-ként olvas. Aktuális idő: `Time::now()` (nem `now()`), különösen lekérdezési feltételben, mert a query builder nem alakít időzónát. API-kimenet: `Time::iso()` → `2026-10-27T20:00:00.000Z` (a modell `toArray()`/JSON is ezt adja); bemenet: `Time::fromIso()`. Az ezredmásodperc alatti rész levágódik.
 - Szinkronizált tábla (saját ID-val): `datetimes(3)` + `softDeletesDatetime` + `index(['updated_at', 'id'])` (pull kurzor, Q3). Egyedi index soft delete mellett: a `not_deleted` generált oszloppal (`case when deleted_at is null then 1 end`, lásd `users`), a modellben `$guarded` és `$hidden`. Ütközés várható helyen (409) savepointban próbálkozz (`DB::transaction()`), mert PostgreSQL-en a hibás utasítás az egész tranzakciót megszakítja.
-- Felsorolás: `string` oszlop, nem DB-`enum`; a modell egy `src/Enums` backed enumra castol, amelynek értékeit a `tests/Unit/EnumsTest.php` a sémával veti össze. Új migráció új táblája a `tests/Feature/MigrationsTest.php` listájába is kerüljön.
+- Felsorolás: `string` oszlop, nem DB-`enum`; a modell egy `src/Enums` backed enumra castol, amelynek értékeit a `tests/Unit/EnumsTest.php` a sémával veti össze. Új migráció új táblája a `tests/Pest.php` `WAYPOST_TABLES` listájába is kerüljön.
+- PIN: a kódban csak a `Waypost\Pin\PinHasher`-rel (nem közvetlen `hash_pbkdf2`; teszt független ellenőrzésként számolhat így), az egyediség a `SitePins`-szel; a paramétereket a `waypost-schema` `pin/test-vectors.json`-ja rögzíti. E-mail-cím: a `User` kisbetűsen tárolja, keresni is kisbetűsítve kell.
+- Artisan-parancs kimenete magyar; a `$this->components->info()` pontot tesz a végére, ezért parancsjavaslattal ne végződjön az üzenet. A tesztben `artisanCommand()` (a `Pest\Laravel\artisan()` típusa `PendingCommand|int`).
 - Lebegőpontos szám a láncolt adatban sehol; a koordináta `lat_e7` / `lng_e7`, a pontosság `accuracy_dm` (egészek).
 - A bemenő JSON-t a `waypost/schema` sémái ellenőrzik (opis/json-schema), a FormRequest csak az adatbázisfüggő szabályokat nézi. Ha egy sémamintát PHP-ban is használunk, a PCRE-be `D` módosítóval kerül (`/…$/D`), különben a `$` a záró sortörés előtt is illeszkedik; a teszt a sémafájlból olvasott mintával veti össze (`schemaPattern()`).
 - PHPStan (Larastan) 8-as szint a `src`, `config`, `tests` és `workbench` alatt; `ignoreErrors` csak indokolt, szűk (`identifier` + `path`) kivétellel. A Pest-tesztekben `$this->…` helyett a `Pest\Laravel\…` függvények (`travelTo()`, `actingAs()` …), mert a PHPStan a closure `$this`-ét nem ismeri.
@@ -58,6 +64,7 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm php composer analyse` – PHPStan.
 - `docker compose run --rm php composer lint` – Pint ellenőrzés; `composer format` – javítás.
 - PostgreSQL 16-on: `docker compose --profile pgsql up -d --wait pgsql`, majd `docker compose run --rm -e DB_CONNECTION=pgsql -e DB_HOST=pgsql -e DB_PORT=5432 php composer test`. Migrációt vagy nyers lekérdezést érintő változásnál futtasd.
+- `docker compose run --rm php sh scripts/install-smoke.sh` – a csomag telepítése egy friss Laravel 13 alkalmazásba (`composer require`, `waypost:install --migrate`, `waypost:create-supervisor`, SQLite). A telepítést vagy a csomag függőségeit érintő változásnál futtasd.
 - `docker compose run --rm php composer build` – a workbench adatbázisának újraépítése (wipe + migrate + demó-seeder). `composer seed` – csak a seeder (üres, migrált adatbázison). A demó belépési adatai a `workbench/database/seeders/DatabaseSeeder.php` konstansaiban.
 - `docker compose run --rm --service-ports php composer serve` – build, majd a workbench a `http://localhost:8088` címen (`WAYPOST_PORT` felülírja; a 8000 a hoston foglalt).
 - `docker compose run --rm php vendor/bin/testbench <artisan parancs>` – artisan a workbench alkalmazásban.

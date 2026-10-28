@@ -7,6 +7,7 @@ namespace Waypost\Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Waypost\Enums\Role;
 use Waypost\Models\User;
+use Waypost\Pin\PinHasher;
 
 /**
  * A guard without PIN by default (PBKDF2 with 100 000 iterations is slow; use withPin() when needed).
@@ -43,17 +44,9 @@ final class UserFactory extends Factory
         return $this->state(fn () => ['active' => false]);
     }
 
-    /** PBKDF2-HMAC-SHA256 of the PIN with a random 16-byte salt and 100 000 iterations (spec: PIN-kód). */
+    /** The PIN's verifier (PinHasher). */
     public function withPin(string $pin): self
     {
-        return $this->state(function () use ($pin) {
-            $salt = random_bytes(16);
-
-            return [
-                'pin_hash' => base64_encode(hash_pbkdf2('sha256', $pin, $salt, 100_000, 32, true)),
-                'pin_salt' => base64_encode($salt),
-                'pin_iterations' => 100_000,
-            ];
-        });
+        return $this->state(fn () => app(PinHasher::class)->hash($pin)->attributes());
     }
 }

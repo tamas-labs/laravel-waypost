@@ -8,12 +8,14 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\Access\Authorizable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Waypost\Database\Factories\UserFactory;
 use Waypost\Enums\Role;
 use Waypost\Models\Concerns\HasWaypostTokens;
@@ -58,6 +60,17 @@ final class User extends Model implements AuthenticatableContract, AuthorizableC
             'pin_iterations' => 'integer',
             'active' => 'boolean',
         ];
+    }
+
+    /**
+     * Stored trimmed and lowercase, so it is unique and found case-insensitively on every database (MySQL's
+     * collation would ignore case, PostgreSQL's does not).
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => $value === null ? null : Str::lower(trim($value)));
     }
 
     /** @return BelongsToMany<Site, $this> */

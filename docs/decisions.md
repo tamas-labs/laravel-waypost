@@ -121,13 +121,46 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
 ## 2026-10-28 – A migrációk publikálása és a PostgreSQL-próba
 
 - **Kérdés:** A csomag betöltse (`loadMigrationsFrom`) vagy publikálja a migrációkat? Hogyan fut a PostgreSQL 16-os próba?
-- **Döntés:** Publikálja (`publishesMigrations`, `waypost-migrations` tag; a `waypost:install`, M2-07 ezt hívja). A workbench és a tesztek a `testbench.yaml` `migrations` listájából töltik be őket. A PostgreSQL 16 egy `pgsql` profilú Compose-szolgáltatás (`postgres:16-alpine`, tmpfs-en); a teljes tesztkészlet környezeti változókkal fut rajta (`CLAUDE.md`). A fejlesztői MySQL bináris napló és commitonkénti lemezre írás nélkül fut, mert a migrációk sok DDL-utasítása így kb. kétszer gyorsabb.
+- **Döntés:** Publikálja (`publishesMigrations`, `waypost-migrations` tag; a `waypost:install` saját maga másolja őket, lásd *A `waypost:install` parancs*). A workbench és a tesztek a `testbench.yaml` `migrations` listájából töltik be őket. A PostgreSQL 16 egy `pgsql` profilú Compose-szolgáltatás (`postgres:16-alpine`, tmpfs-en); a teljes tesztkészlet környezeti változókkal fut rajta (`CLAUDE.md`). A fejlesztői MySQL bináris napló és commitonkénti lemezre írás nélkül fut, mert a migrációk sok DDL-utasítása így kb. kétszer gyorsabb.
 - **Indok:** A specifikáció szerint a telepítés publikálja a migrációkat; ha a csomag be is töltené őket, a publikált példányokkal együtt kétszer futnának. A PostgreSQL-próba így nem kézi, hanem ugyanaz a tesztkészlet.
 - **Érintett:** `src/WaypostServiceProvider.php`, `testbench.yaml`, `compose.yaml`, M2-03, M2-07.
 
 ## 2026-10-28 – A demó-seeder
 
 - **Kérdés:** Milyen ismert adatokkal dolgozzon a workbench és az app M3-as tesztje, és hogyan fusson a seeder?
-- **Döntés:** `Workbench\Database\Seeders\DatabaseSeeder`: „Demó telephely”; supervisor `supervisor@waypost.test` / `password`, PIN `111111`; őrök: Kiss Péter (`222222`), Nagy Anna (`333333`); hat pont (négy NFC, rögzített UID-del `04A1B2C3D4E501`-től `…04`-ig, és két QR); „Külső kör” kötött sorrenddel (1–4. pont) és „Belső kör” szabad sorrenddel (3–6. pont), egy-egy verzióval, 60 másodperces gyalogidőkkel; „Ötpercenként” menetrend a külső körre (`00:00`–`23:55`, 5 perc, 5 perces időkeret). A seeder a workbench build egyik lépése (`composer build`), vagy üres adatbázison `composer seed`, és nem a `testbench.yaml` `seeders` listájában van. A PIN-t egyelőre a `UserFactory::withPin()` számolja; az M2-09 PIN-szolgáltatása váltja ki.
+- **Döntés:** `Workbench\Database\Seeders\DatabaseSeeder`: „Demó telephely”; supervisor `supervisor@waypost.test` / `password`, PIN `111111`; őrök: Kiss Péter (`222222`), Nagy Anna (`333333`); hat pont (négy NFC, rögzített UID-del `04A1B2C3D4E501`-től `…04`-ig, és két QR); „Külső kör” kötött sorrenddel (1–4. pont) és „Belső kör” szabad sorrenddel (3–6. pont), egy-egy verzióval, 60 másodperces gyalogidőkkel; „Ötpercenként” menetrend a külső körre (`00:00`–`23:55`, 5 perc, 5 perces időkeret). A seeder a workbench build egyik lépése (`composer build`), vagy üres adatbázison `composer seed`, és nem a `testbench.yaml` `seeders` listájában van. A PIN-t a `UserFactory::withPin()` a `PinHasher`-rel számolja (M2-09).
 - **Indok:** A `seeders` listát a Testbench minden `RefreshDatabase` után is lefuttatná, ami a tesztek adatait összekeverné. Az M2-06 „kész” feltétele (a pull a teljes demóállapotot adja) az M2-23-ban ellenőrizhető; addig egy feature teszt nézi a seedelt állapotot.
 - **Érintett:** `workbench/database/seeders/DatabaseSeeder.php`, `testbench.yaml`, `composer.json`, M2-06, M2-09, M2-23, M3.
+
+## 2026-10-28 – A `waypost:install` parancs
+
+- **Kérdés:** Elég-e, ha az install a `vendor:publish`-t hívja a két taggel, és mikor fussanak a migrációk?
+- **Döntés:**
+  - A `config/waypost.php`-t és a migrációkat a parancs maga másolja, nem a `vendor:publish`. Egy migráció akkor kerül ki, ha a gazda-alkalmazásban sincs meg a dátum nélküli nevével (`create_waypost_users_table.php`), sem fájlként, sem a `migrations` táblában lefutottként. Az új fájlok dátuma a mostani idő, másodpercenként eggyel nő, a csomag sorrendjében, és mindig a gazda legkésőbbi migrációja után jön, akkor is, ha az a mostaninál későbbre van datálva.
+  - A meglévő `config/waypost.php` csak `--force`-szal íródik felül.
+  - A migrációk `--migrate`-tel kérdés nélkül futnak; interaktívan a parancs megkérdezi (alapértelmezés: igen); `--no-interaction` mellett `--migrate` nélkül nem futnak. A `migrate` `--force`-szal fut, mert a felhasználó kifejezetten kérte.
+  - A parancsok kimenete magyar, mint minden, ami a felhasználónak szól.
+  - Próba: `tests/Install` egy workbench nélküli alkalmazásban (ott a migrátor csak a publikált fájlokat látja, a config és a database könyvtár ideiglenes), és a `scripts/install-smoke.sh` egy valódi, friss `laravel/laravel` 13-ba telepít `composer require`-rel (SQLite).
+- **Indok:** A `vendor:publish` a migrációt a mostani dátumra nevezi át, és a meglévőt az eredeti néven keresi, ezért minden újabb futás újra kimásolná az összeset, és a `migrate` „table already exists” hibával állna le. Csomagfrissítés után viszont az installnak az új migrációkat ki kell vinnie. A lefutott migrációk figyelése miatt a `schema:dump --prune` után sem másol újra semmit.
+- **Érintett:** `src/Console/InstallCommand.php`, `src/WaypostServiceProvider.php`, `tests/Install/`, `tests/InstallTestCase.php`, `scripts/install-smoke.sh`, M2-07.
+
+## 2026-10-28 – A `waypost:create-supervisor` parancs és az e-mail-címek alakja
+
+- **Kérdés:** Mit kér be a parancs, mit ellenőriz, és hogyan egyedi az e-mail-cím?
+- **Döntés:**
+  - Név, e-mail-cím és jelszó: `--name`, `--email`, `--password`. Ami hiányzik, azt interaktívan bekéri, a jelszót kétszer. `--no-interaction` mellett a hiányzó érték hiba. A válaszokat beíráskor ellenőrzi; a magyar hibaüzenetek a parancsban vannak.
+  - Szabályok: a név kötelező, legfeljebb 255 karakter; az e-mail-cím érvényes, legfeljebb 255 karakter, és egyedi a nem törölt felhasználók között; a jelszó 8–255 karakter. A nevet és az e-mail-címet a parancs körülvágja. Ha két futás egyszerre hozná létre ugyanazt a címet, az egyedi index miatti hibát ugyanazzal az üzenettel jelzi.
+  - A supervisor aktív, és nincs se PIN-je, se telephelye. A PIN telephelyen belül egyedi, ezért telephely nélkül nincs mihez mérni; később az API adja meg (M2-17).
+  - Az e-mail-címet a `User` modell körülvágva és kisbetűsen tárolja (mutator), így bárhonnan érkezik, egyedi és kis- és nagybetűtől függetlenül kereshető. **Következmény az M2-14-ben:** a belépés a beírt címet kisbetűsítve keresi.
+- **Indok:** A MySQL kollációja nem különbözteti meg a kis- és nagybetűt, a PostgreSQL-é igen; a kisbetűs tárolással mindkettőn ugyanaz az egyediség és a keresés. A jelszó alsó határa a Laravel szokásos minimuma. A gazda `Password::defaults()` beállítását a parancs nem használja, mert annak üzenetei nem magyarok.
+- **Érintett:** `src/Console/CreateSupervisorCommand.php`, `src/Models/User.php`, M2-08, M2-14, M2-17.
+
+## 2026-10-28 – PIN-szolgáltatás (Q11)
+
+- **Kérdés:** Hogyan számol a szerver PIN-t, hogyan generál, és pontosan kik között egyedi egy PIN?
+- **Döntés:**
+  - `Waypost\Pin\PinHasher`: `hash()` (friss só, 100 000 iteráció) → `PinHash` (`pin_hash`, `pin_salt`, `pin_iterations`); `check()` a tárolt iterációszámmal számol, hibás alakú PIN-re vagy sérült ellenőrzőre `false`; `generate()` egyenletes eloszlású 6 jegyű PIN, a vezető nullákkal együtt (`Random\Randomizer`, alapból kriptográfiai motorral). A paraméterek és az esetek a `waypost-schema` `pin/test-vectors.json`-jából jönnek (Q11, a döntés a `../waypost-schema/docs/decisions.md`-ben); a teszt a vektorfájlból olvas.
+  - `Waypost\Pin\SitePins`: `isTaken($pin, $siteIds, except: $user)` és `generate($siteIds, except: $user)`. A PIN azok között egyedi, akik a megadott telephelyek bármelyikéhez hozzá vannak rendelve, és van PIN-jük. Az őr és a supervisor ugyanabban a térben van, mert a PIN egyben az azonosító. Az inaktív felhasználó számít, mert újra aktiválható; a törölt nem. A jelölt PIN-t a gép minden ilyen felhasználó sójával és iterációszámával újraszámolja (telephelyenként néhány tucat felhasználónál ez egy-két másodperc). A `generate()` legfeljebb 100 jelöltet próbál, és a már elutasítottat nem számolja újra; ha nem talál szabadot, kivételt dob.
+  - Ismert korlát: egy meglévő, PIN-nel rendelkező felhasználó új telephelyhez rendelésekor a szerver nem tudja ellenőrizni az ütközést, mert csak a hasht ismeri. **Az M2-16-ban dönteni kell:** a hozzárendeléskor PIN-t kér (vagy generál), vagy elfogadja a kockázatot. Javaslat: ha a felhasználónak van PIN-je, a hozzárendelés új PIN-t generál, és egyszer visszaadja.
+- **Indok:** Az app ugyanezt a PBKDF2-t számolja offline, ezért mindkét oldal ugyanazokkal a vektorokkal tesztel; ha bármelyik paraméter vagy kódolás eltér, a teszt bukik, nem a belépés a terepen. A véletlenforrás cserélhető, így a tesztben az ütközés és a kimerülés is előidézhető.
+- **Érintett:** `src/Pin/`, `database/factories/UserFactory.php`, M2-09, M2-16, M2-17, M3-15, Q11.
