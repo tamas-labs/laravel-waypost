@@ -31,6 +31,11 @@ final class ApiException extends HttpException
         return new self(ErrorCode::Forbidden, $message);
     }
 
+    public static function notFound(): self
+    {
+        return new self(ErrorCode::NotFound);
+    }
+
     public static function deviceRevoked(): self
     {
         return new self(ErrorCode::DeviceRevoked);

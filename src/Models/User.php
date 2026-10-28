@@ -8,6 +8,7 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -52,6 +53,9 @@ final class User extends Model implements AuthenticatableContract, AuthorizableC
 
     protected $hidden = ['password', 'not_deleted'];
 
+    /** The database default, so a new model has it before it is read back. */
+    protected $attributes = ['active' => true];
+
     protected function casts(): array
     {
         return [
@@ -77,6 +81,27 @@ final class User extends Model implements AuthenticatableContract, AuthorizableC
     public function sites(): BelongsToMany
     {
         return $this->belongsToMany(Site::class, Table::name('site_user'));
+    }
+
+    /**
+     * Whether a site of the user (or the given one) would be left without an active supervisor, and so without
+     * anybody who could manage it, if the user were gone.
+     */
+    public function isLastSupervisor(?string $siteId = null): bool
+    {
+        if ($this->role !== Role::Supervisor || !$this->active) {
+            return false;
+        }
+
+        $sites = $this->sites()->whereDoesntHave(
+            'users',
+            fn (Builder $users) => $users->where('role', Role::Supervisor)->where('active', true)->whereKeyNot($this->id),
+        );
+        if ($siteId !== null) {
+            $sites->whereKey($siteId);
+        }
+
+        return $sites->exists();
     }
 
     /** @return HasMany<ReportSubscription, $this> */

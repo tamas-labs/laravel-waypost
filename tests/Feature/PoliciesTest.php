@@ -108,20 +108,25 @@ it('lets a supervisor manage the users of their sites and themselves', function 
     [$own, $foreign, $supervisor] = twoSites();
     $caller = supervisorCaller($supervisor);
     $colleague = User::factory()->create();
-    $colleague->sites()->attach([$own->id, $foreign->id]);
+    $colleague->sites()->attach($own->id);
+    // Also on a site the caller does not manage: seen, but not changed (that would take over their other site).
+    $shared = User::factory()->supervisor()->create();
+    $shared->sites()->attach([$own->id, $foreign->id]);
     $stranger = User::factory()->create();
     $stranger->sites()->attach($foreign->id);
     $unassigned = User::factory()->create();
 
     foreach (['view', 'update', 'delete'] as $ability) {
         expect(outcome(inspect($caller, $ability, $colleague)))->toBe('allow', $ability);
+        expect(outcome(inspect($caller, $ability, $shared)))->toBe($ability === 'view' ? 'allow' : 403, $ability);
         expect(outcome(inspect($caller, $ability, $stranger)))->toBe(404, $ability);
         expect(outcome(inspect($caller, $ability, $unassigned)))->toBe(404, $ability);
     }
     expect(outcome(inspect($caller, 'view', $supervisor)))->toBe('allow');
     expect(outcome(inspect($caller, 'update', $supervisor)))->toBe('allow');
     expect(outcome(inspect($caller, 'delete', $supervisor)))->toBe(403);
-    expect(outcome(inspect($caller, 'create', User::class)))->toBe('allow');
+    expect(outcome(inspect($caller, 'create', [User::class, [$own->id]])))->toBe('allow');
+    expect(outcome(inspect($caller, 'create', [User::class, [$own->id, $foreign->id]])))->toBe(403);
 });
 
 it('keeps the acting supervisor on the site phone\'s site', function (): void {

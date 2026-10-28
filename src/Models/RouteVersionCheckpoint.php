@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use LogicException;
 use Waypost\Database\Factories\RouteVersionCheckpointFactory;
 use Waypost\Models\Concerns\HasPrefixedTable;
 
@@ -30,6 +31,12 @@ final class RouteVersionCheckpoint extends Pivot
     protected $table = 'route_version_checkpoints';
 
     public $timestamps = false;
+
+    /** Never changes, like its version. */
+    protected static function booted(): void
+    {
+        static::updating(fn (): never => throw new LogicException('A route version never changes; create a new version.'));
+    }
 
     protected function casts(): array
     {

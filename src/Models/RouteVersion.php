@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 use Waypost\Database\Factories\RouteVersionFactory;
 use Waypost\Support\Table;
 
@@ -31,6 +32,12 @@ final class RouteVersion extends Model
     use HasFactory;
 
     public const UPDATED_AT = null;
+
+    /** A version never changes: a change of the route's checkpoints is a new version. */
+    protected static function booted(): void
+    {
+        static::updating(fn (): never => throw new LogicException('A route version never changes; create a new version.'));
+    }
 
     protected function casts(): array
     {

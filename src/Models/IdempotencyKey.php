@@ -38,6 +38,8 @@ final class IdempotencyKey extends Model
     {
         return [
             'response_status' => 'integer',
+            // A response may carry a secret shown only once (a generated PIN, a device token).
+            'response_body' => 'encrypted',
             'expires_at' => 'datetime',
         ];
     }

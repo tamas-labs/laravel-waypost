@@ -9,8 +9,11 @@ use Waypost\Auth\Caller;
 use Waypost\Models\User;
 
 /**
- * Users who share a site with the supervisor (through the site phone: who are assigned to the phone's site), and
- * the supervisor themselves. Nobody deletes themselves, so a site never loses its last supervisor by accident.
+ * A supervisor sees the users who share a site with them (through the site phone: who are assigned to the phone's
+ * site), and themselves. Changing or deleting another user needs every site of that user: otherwise a supervisor
+ * of one shared site could take over a colleague's account (e-mail, password, PIN) and with it the colleague's
+ * other sites. Nobody deletes themselves; as the caller manages every site of the user, no site loses its last
+ * supervisor this way.
  */
 final class UserPolicy extends Policy
 {
@@ -24,23 +27,40 @@ final class UserPolicy extends Policy
         return $this->isSelf($caller, $user) || $this->sharesSite($caller, $user) ? Response::allow() : Response::denyAsNotFound();
     }
 
-    /** The new user's sites are checked with the site policy (update). */
-    public function create(Caller $caller): bool
+    /**
+     * A new user on the given sites: each of them the caller's.
+     *
+     * @param  list<string>  $siteIds
+     */
+    public function create(Caller $caller, array $siteIds): Response
     {
-        return true;
+        foreach ($siteIds as $siteId) {
+            $response = $this->createOnSite($caller, $siteId);
+            if ($response->denied()) {
+                return $response;
+            }
+        }
+
+        return Response::allow();
     }
 
+    /** Also the PIN, and assigning the user to another site (which gives them a new PIN). */
     public function update(Caller $caller, User $user): Response
     {
-        return $this->view($caller, $user);
+        return $this->isSelf($caller, $user) ? Response::allow() : $this->manage($caller, $user);
     }
 
     public function delete(Caller $caller, User $user): Response
     {
+        return $this->isSelf($caller, $user) ? Response::deny('Saját magadat nem törölheted.') : $this->manage($caller, $user);
+    }
+
+    private function manage(Caller $caller, User $user): Response
+    {
         return match (true) {
-            $this->isSelf($caller, $user) => Response::deny('Saját magadat nem törölheted.'),
-            $this->sharesSite($caller, $user) => Response::allow(),
-            default => Response::denyAsNotFound(),
+            !$this->sharesSite($caller, $user) => Response::denyAsNotFound(),
+            $user->sites()->whereKeyNot($caller->siteIds())->exists() => Response::deny('A felhasználó olyan telephelyhez is tartozik, amelyet nem kezelsz.'),
+            default => Response::allow(),
         };
     }
 

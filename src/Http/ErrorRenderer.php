@@ -42,6 +42,9 @@ final readonly class ErrorRenderer
         503 => 'A szolgáltatás átmenetileg nem érhető el, próbáld újra később.',
     ];
 
+    /** AuthorizationException's message when the policy gave none. */
+    private const string LARAVEL_DENIAL = 'This action is unauthorized.';
+
     public function __construct(private Repository $config)
     {
     }
@@ -63,10 +66,9 @@ final readonly class ErrorRenderer
         return match (true) {
             $e instanceof ApiException => self::response($e->errorCode, $e->getMessage(), $e->details, $e->getHeaders()),
             $e instanceof AuthenticationException => self::response(ErrorCode::Unauthenticated),
-            $e instanceof AuthorizationException => self::response(
-                $e->status() === 404 ? ErrorCode::NotFound : ErrorCode::Forbidden,
-                status: $e->status() === 404 ? 404 : 403,
-            ),
+            $e instanceof AuthorizationException => $e->status() === 404
+                ? self::response(ErrorCode::NotFound)
+                : self::response(ErrorCode::Forbidden, self::denial($e)),
             $e instanceof ModelNotFoundException,
             $e instanceof RecordNotFoundException,
             $e instanceof RecordsNotFoundException,
@@ -77,6 +79,12 @@ final readonly class ErrorRenderer
             $e instanceof HttpExceptionInterface => $this->httpError($e, $request),
             default => self::response(ErrorCode::ServerError),
         };
+    }
+
+    /** The reason a policy gave (in Hungarian), not Laravel's English default. */
+    private static function denial(AuthorizationException $e): ?string
+    {
+        return $e->getMessage() === self::LARAVEL_DENIAL ? null : $e->getMessage();
     }
 
     /**

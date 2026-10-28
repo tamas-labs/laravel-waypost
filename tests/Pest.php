@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Testing\PendingCommand;
 use Illuminate\Testing\TestResponse;
 use Opis\JsonSchema\Errors\ErrorFormatter;
@@ -16,6 +17,7 @@ use Waypost\Tests\TestCase;
 use Waypost\Validation\SchemaValidator;
 
 use function Pest\Laravel\artisan;
+use function Pest\Laravel\call;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
 pest()->extend(InstallTestCase::class)->in('Install');
@@ -110,4 +112,29 @@ function supervisorOf(Site ...$sites): User
     $user->sites()->attach(array_map(fn (Site $site): string => $site->id, $sites));
 
     return $user;
+}
+
+/**
+ * A request to the API (the path under the prefix) by a supervisor with their own token, or by the site phone acting
+ * for them (X-Acting-User). A write request gets a fresh Idempotency-Key; an empty body is sent as {}.
+ *
+ * @param  array<string, mixed>  $body
+ * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+ */
+function callApi(string $method, string $path, User $supervisor, array $body = [], ?Device $phone = null): TestResponse
+{
+    $headers = ['Authorization' => 'Bearer ' . ($phone === null ? supervisorToken($supervisor) : deviceToken($phone))];
+    if ($phone !== null) {
+        $headers[Authenticate::ACTING_USER_HEADER] = $supervisor->id;
+    }
+    if ($method !== 'GET') {
+        $headers['Idempotency-Key'] = (string) Str::uuid();
+    }
+    $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'];
+    foreach ($headers as $name => $value) {
+        $server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = $value;
+    }
+    $content = $body === [] ? '{}' : json_encode($body, JSON_THROW_ON_ERROR);
+
+    return call($method, "api/waypost/v1/{$path}", server: $server, content: $content);
 }

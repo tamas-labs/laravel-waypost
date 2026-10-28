@@ -34,6 +34,9 @@ final class Route extends Model
     use HasFactory;
     use SoftDeletes;
 
+    /** The database default, so a new model has it before it is read back. */
+    protected $attributes = ['active' => true];
+
     protected function casts(): array
     {
         return [

@@ -32,6 +32,12 @@ final class Site extends Model
     use HasFactory;
     use SoftDeletes;
 
+    /** The database defaults, so a new model has them before it is read back. */
+    protected $attributes = [
+        'timezone' => 'Europe/Budapest',
+        'no_data_alert_after_min' => 120,
+    ];
+
     protected function casts(): array
     {
         return ['no_data_alert_after_min' => 'integer'];

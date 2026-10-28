@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waypost\Validation;
 
+use Illuminate\Validation\ValidationException;
 use Opis\JsonSchema\Errors\ValidationError;
 use Opis\JsonSchema\Validator;
 use Waypost\Schema\Paths;
@@ -33,6 +34,20 @@ final class SchemaValidator
     {
         $this->validator = new Validator(max_errors: self::MAX_ERRORS, stop_at_first_error: false);
         $this->validator->resolver()?->registerPrefix(Paths::SCHEMA_ID_BASE, Paths::schemaDirectory() . '/');
+    }
+
+    /**
+     * Throws validation_failed with the errors, if the data (e.g. a record as the API returns it, in arrays) is not
+     * valid against the schema.
+     *
+     * @throws ValidationException
+     */
+    public function assertValid(mixed $data, string $schema): void
+    {
+        $errors = $this->errors(json_decode((string) json_encode($data, JSON_THROW_ON_ERROR), flags: JSON_THROW_ON_ERROR), $schema);
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /** The error tree of opis/json-schema, null if the data is valid. */
@@ -101,6 +116,8 @@ final class SchemaValidator
             'required' => self::each($path, $args['missing'], 'Kötelező mező.'),
             'additionalProperties' => self::each($path, self::undeclared($error, $args['properties']), 'Ismeretlen mező.'),
             'properties' => self::each($path, [$args['property']], 'Ez a mező nem megengedett.'),
+            // In the schemas, "not" only says "not null": a field that must have a value here.
+            'not' => [[self::key($path), self::forbidsNull($error) ? 'Meg kell adni.' : 'Érvénytelen érték.']],
             default => [[self::key($path), self::message($error->keyword(), $args)]],
         };
     }
@@ -132,6 +149,13 @@ final class SchemaValidator
             is_array($names) ? $names : [],
             fn (mixed $name): bool => (is_int($name) || is_string($name)) && !in_array((string) $name, $declared, true),
         ));
+    }
+
+    private static function forbidsNull(ValidationError $error): bool
+    {
+        $schema = $error->schema()->info()->data();
+
+        return is_object($schema) && isset($schema->not) && is_object($schema->not) && get_object_vars($schema->not) === ['type' => 'null'];
     }
 
     /** @param  list<int|string>  $path */

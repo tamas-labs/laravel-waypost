@@ -46,6 +46,9 @@ final class Checkpoint extends Model
 
     protected $hidden = ['not_deleted'];
 
+    /** The database default, so a new model has it before it is read back. */
+    protected $attributes = ['active' => true];
+
     protected function casts(): array
     {
         return [
