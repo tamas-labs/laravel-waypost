@@ -1,0 +1,19 @@
+# Dependencies
+/vendor/
+
+# Library package: the lock file is not committed
+/composer.lock
+
+# Tool caches and local overrides
+/.phpunit.cache/
+/build/
+/phpunit.xml
+/phpstan.neon
+.env
+
+# Logs and OS / editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,39 @@
+# Local development environment: there is no PHP or Composer on the host.
+#   docker compose run --rm php composer install
+#   docker compose run --rm php composer test
+#   docker compose run --rm --service-ports php composer serve   # http://localhost:8088
+# The parent directory is mounted so that the Composer path repository ../waypost-schema resolves.
+services:
+  php:
+    build: docker/php
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /work/laravel-waypost
+    volumes:
+      - ..:/work
+      - ${COMPOSER_CACHE_DIR:-~/.cache/composer}:/tmp/composer/cache
+    ports:
+      - "${WAYPOST_PORT:-8088}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: waypost
+      MYSQL_USER: waypost
+      MYSQL_PASSWORD: waypost
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${WAYPOST_MYSQL_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uwaypost", "-pwaypost"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mysql-data:

@@ -1,0 +1,10 @@
+{
+    "preset": "per",
+    "rules": {
+        "declare_strict_types": true,
+        "function_declaration": {
+            "closure_fn_spacing": "one"
+        },
+        "single_line_empty_body": false
+    }
+}

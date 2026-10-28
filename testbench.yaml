@@ -1,0 +1,42 @@
+# Orchestra Testbench workbench: the Laravel 13 application the package runs in during development
+# and tests. The database is the MySQL service of compose.yaml (the tests use waypost_test, see
+# phpunit.xml.dist). Testbench skips package discovery, so the package's provider is listed here; the
+# tests load it through WithWorkbench too.
+laravel: '@testbench'
+
+env:
+  APP_NAME: Waypost
+  APP_ENV: local
+  APP_KEY: base64:tSZsK4Li7zAgClUkzb3aRVUAuFvgyVeHI5qJOmDLd2E=
+  APP_DEBUG: true
+  APP_TIMEZONE: UTC
+  DB_CONNECTION: mysql
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_DATABASE: waypost
+  DB_USERNAME: waypost
+  DB_PASSWORD: waypost
+
+providers:
+  - Waypost\WaypostServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
+workbench:
+  start: '/'
+  install: true
+  health: false
+  discovers:
+    web: true
+    api: false
+    commands: false
+    components: false
+    factories: false
+    views: false
+  build:
+    - db-wipe
+    - migrate-fresh
