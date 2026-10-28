@@ -8,6 +8,7 @@ use DateTimeInterface;
 use LogicException;
 use Waypost\Auth\Caller;
 use Waypost\Models\Checkpoint;
+use Waypost\Models\Device;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Route;
 use Waypost\Models\RouteVersion;
@@ -65,6 +66,22 @@ final class Entities
             'site_ids' => $siteIds,
             'created_at' => self::time($user->created_at),
             'updated_at' => self::time($user->updated_at),
+        ];
+    }
+
+    /** @return array<string, mixed> entities/device.json: never the secret or the chain state */
+    public static function device(Device $device): array
+    {
+        return [
+            'id' => $device->id,
+            'site_id' => $device->site_id,
+            'name' => $device->name,
+            'platform' => $device->platform->value,
+            'app_version' => $device->app_version,
+            'enrolled_by' => $device->enrolled_by,
+            'enrolled_at' => Time::iso($device->enrolled_at),
+            'revoked_at' => $device->revoked_at === null ? null : Time::iso($device->revoked_at),
+            'last_seen_at' => $device->last_seen_at === null ? null : Time::iso($device->last_seen_at),
         ];
     }
 

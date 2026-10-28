@@ -85,8 +85,9 @@ it('can run again: publishes only the missing migrations and keeps the config', 
         ->and(File::get(config_path('waypost.php')))->toBe("<?php\n\nreturn [];\n");
 
     // A newer version of the package brings a migration the application does not have yet.
-    File::delete(database_path('migrations/' . $first[13]));
-    $first = array_slice($first, 0, 13);
+    $last = count($first) - 1;
+    File::delete(database_path('migrations/' . $first[$last]));
+    $first = array_slice($first, 0, $last);
 
     artisanCommand('waypost:install', ['--migrate' => true, '--force' => true])
         ->expectsOutputToContain('1 migráció publikálva')
@@ -94,9 +95,9 @@ it('can run again: publishes only the missing migrations and keeps the config', 
         ->assertSuccessful();
 
     // Dated after the others, even within the same seconds.
-    expect(array_slice(publishedMigrations(), 0, 13))->toBe($first)
-        ->and(publishedMigrations()[13])->toBeGreaterThan($first[12])
-        ->and(withoutDate(publishedMigrations()[13]))->toBe(withoutDate(packageMigrations()[13]))
+    expect(array_slice(publishedMigrations(), 0, $last))->toBe($first)
+        ->and(publishedMigrations()[$last])->toBeGreaterThan($first[$last - 1])
+        ->and(withoutDate(publishedMigrations()[$last]))->toBe(withoutDate(packageMigrations()[$last]))
         ->and(File::get(config_path('waypost.php')))->toBe(File::get(WaypostServiceProvider::CONFIG_FILE))
         ->and(tablesWithPrefix('waypost_'))->toHaveCount(count(WAYPOST_TABLES));
 });

@@ -28,12 +28,14 @@ use Waypost\Http\ErrorRenderer;
 use Waypost\Http\Middleware\FormatApiResponse;
 use Waypost\Jobs\PruneIdempotencyKeys;
 use Waypost\Models\Checkpoint;
+use Waypost\Models\Device;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Route;
 use Waypost\Models\Schedule as RoundSchedule;
 use Waypost\Models\Site;
 use Waypost\Models\User;
 use Waypost\Auth\Policies\CheckpointPolicy;
+use Waypost\Auth\Policies\DevicePolicy;
 use Waypost\Auth\Policies\ReportSubscriptionPolicy;
 use Waypost\Auth\Policies\RoutePolicy;
 use Waypost\Auth\Policies\SchedulePolicy;
@@ -53,6 +55,7 @@ final class WaypostServiceProvider extends ServiceProvider
     public const array POLICIES = [
         Site::class => SitePolicy::class,
         User::class => UserPolicy::class,
+        Device::class => DevicePolicy::class,
         Checkpoint::class => CheckpointPolicy::class,
         Route::class => RoutePolicy::class,
         RoundSchedule::class => SchedulePolicy::class,

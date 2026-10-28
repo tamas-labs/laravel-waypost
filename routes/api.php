@@ -6,12 +6,14 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Route;
 use Waypost\Http\Controllers\AuthController;
 use Waypost\Http\Controllers\CheckpointController;
+use Waypost\Http\Controllers\DeviceController;
 use Waypost\Http\Controllers\ReportSubscriptionController;
 use Waypost\Http\Controllers\RouteController;
 use Waypost\Http\Controllers\RouteVersionController;
 use Waypost\Http\Controllers\ScheduleController;
 use Waypost\Http\Controllers\SiteController;
 use Waypost\Http\Controllers\SiteUserController;
+use Waypost\Http\Controllers\SyncController;
 use Waypost\Http\Controllers\UserController;
 use Waypost\Http\Middleware\Authenticate;
 use Waypost\Http\Middleware\HandleIdempotencyKey;
@@ -35,9 +37,17 @@ Route::post('auth/login', [AuthController::class, 'login'])
     ->middleware([ThrottleRequests::using('waypost-login'), ValidateSchema::using('api/auth-login.request')])
     ->name('auth.login');
 
-Route::middleware([Authenticate::using(Authenticate::SUPERVISOR), ThrottleRequests::using('waypost')])->group(function (): void {
+Route::middleware([Authenticate::using(Authenticate::SUPERVISOR), ThrottleRequests::using('waypost')])->group(function () use ($write): void {
     // No Idempotency-Key: a repeated logout finds no token and answers unauthenticated, which means the same.
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+
+    // With the supervisor's own token only: the site phone itself is what gets enrolled.
+    Route::post('devices/enroll', [DeviceController::class, 'enroll'])->middleware($write('devices-enroll'))->name('devices.enroll');
+});
+
+// The site phone, or a supervisor's own phone (spec: Szinkron protokoll / Pull).
+Route::middleware([Authenticate::using(Authenticate::SUPERVISOR, Authenticate::DEVICE), ThrottleRequests::using('waypost')])->group(function (): void {
+    Route::get('sync/pull', [SyncController::class, 'pull'])->name('sync.pull');
 });
 
 // Configuration (spec: API-szerződés): a supervisor, or the site phone for a supervisor who logged in on it with

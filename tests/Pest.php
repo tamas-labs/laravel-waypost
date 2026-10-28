@@ -24,7 +24,7 @@ pest()->extend(InstallTestCase::class)->in('Install');
 
 /** The package's tables without prefix. A new migration's table goes here too. */
 const WAYPOST_TABLES = [
-    'users', 'personal_access_tokens', 'sites', 'site_user', 'devices', 'checkpoints', 'routes',
+    'users', 'personal_access_tokens', 'sites', 'site_user', 'site_user_detachments', 'devices', 'checkpoints', 'routes',
     'route_versions', 'route_version_checkpoints', 'schedules', 'report_subscriptions',
     'chain_entries', 'shifts', 'rounds', 'scans', 'incidents', 'media', 'reports', 'idempotency_keys',
 ];
@@ -127,7 +127,21 @@ function callApi(string $method, string $path, User $supervisor, array $body = [
     if ($phone !== null) {
         $headers[Authenticate::ACTING_USER_HEADER] = $supervisor->id;
     }
-    if ($method !== 'GET') {
+
+    return requestApi($method, $path, $headers, $body);
+}
+
+/**
+ * A request to the API (the path under the prefix) with the headers (call() ignores withHeaders()). A write request
+ * gets a fresh Idempotency-Key unless the headers have one; an empty body is sent as {}.
+ *
+ * @param  array<string, string>  $headers
+ * @param  array<string, mixed>  $body
+ * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+ */
+function requestApi(string $method, string $path, array $headers, array $body = []): TestResponse
+{
+    if ($method !== 'GET' && !isset($headers['Idempotency-Key'])) {
         $headers['Idempotency-Key'] = (string) Str::uuid();
     }
     $server = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'];
@@ -137,4 +151,17 @@ function callApi(string $method, string $path, User $supervisor, array $body = [
     $content = $body === [] ? '{}' : json_encode($body, JSON_THROW_ON_ERROR);
 
     return call($method, "api/waypost/v1/{$path}", server: $server, content: $content);
+}
+
+/**
+ * GET /sync/pull with the token of a supervisor or a site phone.
+ *
+ * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+ */
+function pullAs(User|Device $caller, ?string $cursor = null): TestResponse
+{
+    $token = $caller instanceof User ? supervisorToken($caller) : deviceToken($caller);
+    $query = $cursor === null ? '' : '?cursor=' . rawurlencode($cursor);
+
+    return requestApi('GET', "sync/pull{$query}", ['Authorization' => "Bearer {$token}"]);
 }

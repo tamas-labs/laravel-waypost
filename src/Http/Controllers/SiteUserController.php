@@ -13,6 +13,8 @@ use Waypost\Http\Exceptions\ApiException;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Site;
 use Waypost\Models\User;
+use Waypost\Support\Table;
+use Waypost\Support\Time;
 
 /** /sites/{id}/users: who is assigned to a site (site_user). */
 final class SiteUserController extends Controller
@@ -63,7 +65,8 @@ final class SiteUserController extends Controller
 
     /**
      * Detaches the user and deletes their report subscriptions of the site. The last active supervisor of the site
-     * stays, so somebody can still manage it.
+     * stays, so somebody can still manage it. The detachment is recorded: sync pull lists the user as deleted for
+     * the callers on the site who no longer see them.
      *
      * @return array{}
      */
@@ -79,6 +82,11 @@ final class SiteUserController extends Controller
 
         DB::transaction(function () use ($site, $user): void {
             $user->sites()->detach($site->id);
+            DB::table(Table::name('site_user_detachments'))->upsert(
+                ['site_id' => $site->id, 'user_id' => $user->id, 'detached_at' => Time::now()->format(Time::DATABASE_FORMAT)],
+                ['site_id', 'user_id'],
+                ['detached_at'],
+            );
             $user->reportSubscriptions()->where('site_id', $site->id)->get()->each(fn (ReportSubscription $subscription) => $subscription->delete());
             $user->touch();
         });
