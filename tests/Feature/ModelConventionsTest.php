@@ -20,8 +20,8 @@ beforeEach(function (): void {
     Schema::create(Table::name('widgets'), function (Blueprint $table): void {
         $table->uuid('id')->primary();
         $table->dateTime('happened_at', 3)->nullable();
-        $table->timestamps(3);
-        $table->softDeletes(precision: 3);
+        $table->datetimes(3);
+        $table->softDeletesDatetime(precision: 3);
     });
 });
 

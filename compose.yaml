@@ -2,6 +2,9 @@
 #   docker compose run --rm php composer install
 #   docker compose run --rm php composer test
 #   docker compose run --rm --service-ports php composer serve   # http://localhost:8088
+# The tests on PostgreSQL 16 instead of MySQL (the pgsql service only starts with its profile):
+#   docker compose --profile pgsql up -d --wait pgsql
+#   docker compose run --rm -e DB_CONNECTION=pgsql -e DB_HOST=pgsql -e DB_PORT=5432 php composer test
 # The parent directory is mounted so that the Composer path repository ../waypost-schema resolves.
 services:
   php:
@@ -19,6 +22,9 @@ services:
 
   mysql:
     image: mysql:8.4
+    # Development only: no binary log and no flush per commit, which makes the many DDL statements of
+    # the migrations several times faster.
+    command: ["--skip-log-bin", "--innodb-flush-log-at-trx-commit=0", "--innodb-doublewrite=OFF"]
     environment:
       MYSQL_DATABASE: waypost
       MYSQL_USER: waypost
@@ -31,6 +37,21 @@ services:
       - "${WAYPOST_MYSQL_PORT:-3306}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uwaypost", "-pwaypost"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  pgsql:
+    image: postgres:16-alpine
+    profiles: [pgsql]
+    environment:
+      POSTGRES_DB: waypost_test
+      POSTGRES_USER: waypost
+      POSTGRES_PASSWORD: waypost
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "waypost", "-d", "waypost_test"]
       interval: 2s
       timeout: 5s
       retries: 30

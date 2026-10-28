@@ -32,7 +32,8 @@
     ],
     "autoload": {
         "psr-4": {
-            "Waypost\\": "src/"
+            "Waypost\\": "src/",
+            "Waypost\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
@@ -58,6 +59,7 @@
         "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
         "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "seed": "@php vendor/bin/testbench db:seed --class=Workbench\\\\Database\\\\Seeders\\\\DatabaseSeeder --ansi",
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",

@@ -21,10 +21,8 @@ providers:
   - Waypost\WaypostServiceProvider
 
 migrations:
+  - database/migrations
   - workbench/database/migrations
-
-seeders:
-  - Workbench\Database\Seeders\DatabaseSeeder
 
 workbench:
   start: '/'
@@ -37,6 +35,10 @@ workbench:
     components: false
     factories: false
     views: false
+  # The seeder runs as a build step, not from a "seeders" list: Testbench would run that list after
+  # every RefreshDatabase in the tests too.
   build:
     - db-wipe
     - migrate-fresh
+    - db-seed:
+        --class: Workbench\Database\Seeders\DatabaseSeeder

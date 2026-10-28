@@ -19,6 +19,11 @@ final class WaypostServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../config/waypost.php' => config_path('waypost.php'),
             ], 'waypost-config');
+
+            // Published (waypost:install) rather than loaded, so the host application owns its migrations.
+            $this->publishesMigrations([
+                __DIR__ . '/../database/migrations' => database_path('migrations'),
+            ], 'waypost-migrations');
         }
     }
 }
