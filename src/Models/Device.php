@@ -31,6 +31,7 @@ use Waypost\Models\Concerns\HasWaypostTokens;
  * @property Carbon $enrolled_at
  * @property Carbon|null $revoked_at
  * @property Carbon|null $last_seen_at
+ * @property Carbon|null $upload_closed_at  a revoked device has finished its last upload
  * @property int $last_seq
  * @property string|null $last_hash
  * @property Carbon|null $created_at
@@ -56,6 +57,7 @@ final class Device extends Model implements AuthenticatableContract
             'enrolled_at' => 'datetime',
             'revoked_at' => 'datetime',
             'last_seen_at' => 'datetime',
+            'upload_closed_at' => 'datetime',
             'last_seq' => 'integer',
         ];
     }

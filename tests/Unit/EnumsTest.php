@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Waypost\Enums\ChainEntryType;
+use Waypost\Enums\ChainFlag;
 use Waypost\Enums\ErrorCode;
 use Waypost\Enums\IncidentCategory;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\OrderMode;
 use Waypost\Enums\Platform;
 use Waypost\Enums\ReportFrequency;
@@ -51,10 +53,18 @@ it('has the values of the schema', function (string $enum, string $schema, strin
     'ShiftClosedBy' => [ShiftClosedBy::class, 'chain/payload-shift_closed', 'closed_by'],
     'ScanMethod' => [ScanMethod::class, 'chain/payload-scan', 'method'],
     'IncidentCategory' => [IncidentCategory::class, 'chain/payload-incident', 'category'],
+    'MediaOwnerType' => [MediaOwnerType::class, 'entities/media', 'owner_type'],
 ]);
 
 it('has every final round status of round_closed', function (): void {
     expect(enumValues(RoundStatus::class))->toContain(...schemaEnum('chain/payload-round_closed', 'status'));
+});
+
+it('keeps the server flags out of the flags of the hashed payload', function (): void {
+    /** @var array{properties: array{flags: array{items: array{enum: list<string>}}}} $payload */
+    $payload = schema('chain/payload-scan');
+
+    expect(array_intersect(enumValues(ChainFlag::class), $payload['properties']['flags']['items']['enum']))->toBe([]);
 });
 
 it('has the error codes of the schema', function (): void {

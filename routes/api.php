@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Waypost\Http\Controllers\AuthController;
 use Waypost\Http\Controllers\CheckpointController;
 use Waypost\Http\Controllers\DeviceController;
+use Waypost\Http\Controllers\MediaController;
 use Waypost\Http\Controllers\ReportSubscriptionController;
 use Waypost\Http\Controllers\RouteController;
 use Waypost\Http\Controllers\RouteVersionController;
@@ -17,6 +18,7 @@ use Waypost\Http\Controllers\SyncController;
 use Waypost\Http\Controllers\UserController;
 use Waypost\Http\Middleware\Authenticate;
 use Waypost\Http\Middleware\HandleIdempotencyKey;
+use Waypost\Http\Middleware\ParseMultipartBody;
 use Waypost\Http\Middleware\ValidateSchema;
 
 // Loaded by WaypostServiceProvider::apiRoutes(): under waypost.route.prefix, named "waypost.…", with server_time
@@ -49,6 +51,26 @@ Route::middleware([Authenticate::using(Authenticate::SUPERVISOR), ThrottleReques
 Route::middleware([Authenticate::using(Authenticate::SUPERVISOR, Authenticate::DEVICE), ThrottleRequests::using('waypost')])->group(function (): void {
     Route::get('sync/pull', [SyncController::class, 'pull'])->name('sync.pull');
 });
+
+// The chain of the site phone (spec: Láncolt napló). A revoked phone gets as far as the controller only on its last upload.
+Route::post('sync/push', [SyncController::class, 'push'])
+    ->middleware([Authenticate::using(Authenticate::DEVICE), ThrottleRequests::using('waypost'), ...$write('sync-push')])
+    ->name('sync.push');
+Route::post('sync/push-final', [SyncController::class, 'pushFinal'])
+    ->middleware([Authenticate::using(Authenticate::DEVICE, Authenticate::REVOKED), ThrottleRequests::using('waypost'), ...$write('sync-push-final')])
+    ->name('sync.push-final');
+
+// A photo: of a chain entry by its phone (also a revoked one, until it closes its upload), of a checkpoint by a
+// supervisor. A multipart body, so MediaController validates its fields against api/media-upload.request.
+Route::put('media/{media}', [MediaController::class, 'upload'])
+    ->whereUuid('media')
+    ->middleware([
+        Authenticate::using(Authenticate::SUPERVISOR, Authenticate::DEVICE, Authenticate::ACTING, Authenticate::REVOKED),
+        ThrottleRequests::using('waypost'),
+        ParseMultipartBody::class,
+        ...$write(),
+    ])
+    ->name('media.upload');
 
 // Configuration (spec: API-szerződés): a supervisor, or the site phone for a supervisor who logged in on it with
 // their PIN (X-Acting-User). A path parameter is a UUID, otherwise there is no such endpoint (and PostgreSQL's uuid

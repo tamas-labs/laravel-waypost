@@ -1,8 +1,8 @@
 #!/bin/sh
 # Installs the package into a fresh Laravel 13 application, as a host would: composer create-project
 # laravel/laravel, path repositories for laravel-waypost and waypost-schema, composer require, waypost:install,
-# waypost:create-supervisor, then a login through its HTTP kernel. The application uses its default SQLite
-# database. Needs network access (Packagist).
+# waypost:create-supervisor, then a login through its HTTP kernel and a photo upload over real HTTP. The application
+# uses its default SQLite database. Needs network access (Packagist).
 # Run it in the php service: docker compose run --rm php sh scripts/install-smoke.sh
 set -eu
 
@@ -62,5 +62,34 @@ response=$(php "$work_dir/login.php" smoke-password)
 echo "$response" | grep -q '^200 {"server_time":"[^"]*","token":"' || fail "the login did not issue a token: $response"
 php artisan route:list --path=api/waypost/v1 --no-interaction | grep -q 'waypost.auth.logout' || fail "the API routes are not registered"
 
-printf '\nok: waypost/laravel-waypost installed into laravel/laravel %s, %s migrations, 1 supervisor, login works\n' \
+step "PUT /api/waypost/v1/media/{id} over real HTTP: PHP parses a multipart PUT only with request_parse_body()"
+token=$(echo "$response" | sed -E 's/.*"token":"([^"]*)".*/\1/')
+php artisan serve --no-interaction --port=8765 > "$work_dir/serve.log" 2>&1 &
+serve_pid=$!
+trap 'kill "$serve_pid" 2>/dev/null || true; rm -rf "$work_dir"' EXIT
+sleep 2
+cat > "$work_dir/upload.php" <<'PHP'
+<?php
+// Usage: php upload.php <token>. Uploads a photo of a new checkpoint, prints the photo's ID and the response's status and body.
+$jpeg = "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00smoke\xFF\xD9";
+$id = '019a2b3c-4d5e-7f00-8a00-000000000b01';
+$fields = ['sha256' => hash('sha256', $jpeg), 'owner_type' => 'checkpoint', 'owner_id' => '019a2b3c-4d5e-7f00-8a00-000000000b02', 'taken_at' => '2026-10-27T20:04:05.123Z'];
+$boundary = 'smoke-boundary';
+$body = '';
+foreach ($fields as $name => $value) {
+    $body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"{$name}\"\r\n\r\n{$value}\r\n";
+}
+$body .= "--{$boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n{$jpeg}\r\n--{$boundary}--\r\n";
+$headers = ["Authorization: Bearer {$argv[1]}", 'Accept: application/json', "Content-Type: multipart/form-data; boundary={$boundary}", 'Idempotency-Key: 019a2b3c-4d5e-7f00-8a00-000000000b03'];
+$content = file_get_contents("http://127.0.0.1:8765/api/waypost/v1/media/{$id}", false, stream_context_create(['http' => ['method' => 'PUT', 'header' => $headers, 'content' => $body, 'ignore_errors' => true]]));
+preg_match('/ (\d{3}) /', $http_response_header[0], $status);
+echo $id, ' ', $status[1], ' ', $content, "\n";
+PHP
+response=$(php "$work_dir/upload.php" "$token")
+media_id=${response%% *}
+echo "$response" | grep -q ' 200 {"server_time":"[^"]*","media":{"id":"' || fail "the multipart PUT did not store the photo: $response ($(cat "$work_dir/serve.log"))"
+[ -f "storage/app/private/waypost/media/$media_id.jpg" ] || fail "the photo is not on the private disk"
+kill "$serve_pid"
+
+printf '\nok: waypost/laravel-waypost installed into laravel/laravel %s, %s migrations, 1 supervisor, login and upload work\n' \
     "$(php artisan --version | sed 's/Laravel Framework //')" "$expected"

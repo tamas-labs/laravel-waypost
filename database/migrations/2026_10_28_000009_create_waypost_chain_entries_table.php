@@ -29,9 +29,12 @@ return new class extends Migration {
             $table->dateTime('received_at', 3);
             $table->string('verify_status', 16);
             $table->json('flags');
+            // When it reached the projections; null: rejected, or it refers to something not on the server yet.
+            $table->dateTime('projected_at', 3)->nullable();
 
             $table->unique(['device_id', 'seq']);
             $table->index(['device_id', 'received_at']);
+            $table->index(['device_id', 'projected_at']);
         });
     }
 

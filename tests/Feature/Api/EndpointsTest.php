@@ -17,7 +17,10 @@ const NOT_CONFIGURATION = [
     'auth.login' => [],
     'auth.logout' => [Authenticate::SUPERVISOR],
     'devices.enroll' => [Authenticate::SUPERVISOR],
+    'media.upload' => [Authenticate::SUPERVISOR, Authenticate::DEVICE, Authenticate::ACTING],
     'sync.pull' => [Authenticate::SUPERVISOR, Authenticate::DEVICE],
+    'sync.push' => [Authenticate::DEVICE],
+    'sync.push-final' => [Authenticate::DEVICE],
 ];
 
 /**
@@ -50,13 +53,14 @@ it('has the endpoints of the spec', function (): void {
         'auth.login', 'auth.logout',
         'checkpoints.destroy', 'checkpoints.index', 'checkpoints.show', 'checkpoints.store', 'checkpoints.update',
         'devices.enroll',
+        'media.upload',
         'report-subscriptions.destroy', 'report-subscriptions.index', 'report-subscriptions.show', 'report-subscriptions.store', 'report-subscriptions.update',
         'routes.destroy', 'routes.index', 'routes.show', 'routes.store', 'routes.update',
         'routes.versions.index', 'routes.versions.show', 'routes.versions.store',
         'schedules.destroy', 'schedules.index', 'schedules.show', 'schedules.store', 'schedules.update',
         'sites.destroy', 'sites.index', 'sites.show', 'sites.store', 'sites.update',
         'sites.users.destroy', 'sites.users.index', 'sites.users.store',
-        'sync.pull',
+        'sync.pull', 'sync.push', 'sync.push-final',
         'users.destroy', 'users.index', 'users.pin', 'users.show', 'users.store', 'users.update',
     ]);
 });

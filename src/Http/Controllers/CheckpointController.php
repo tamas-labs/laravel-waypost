@@ -13,6 +13,7 @@ use Waypost\Enums\TagType;
 use Waypost\Http\Entities;
 use Waypost\Http\Exceptions\ApiException;
 use Waypost\Models\Checkpoint;
+use Waypost\Models\Media;
 use Waypost\Models\Route;
 use Waypost\Validation\SchemaValidator;
 
@@ -102,6 +103,9 @@ final class CheckpointController extends Controller
         if ($checkpoint->qr_payload !== null && !str_starts_with($checkpoint->qr_payload, "waypost:cp:{$checkpoint->id}:")) {
             self::invalid('qr_payload', 'A QR-kód egy másik pont azonosítóját tartalmazza.');
         }
+        if ($checkpoint->photo_media_id !== null && $checkpoint->isDirty('photo_media_id') && !self::hasPhoto($checkpoint)) {
+            self::invalid('photo_media_id', 'Nincs ilyen feltöltött fotó ehhez a ponthoz.');
+        }
         $checkpoint->updateTimestamps();
         $validator->assertValid(Entities::checkpoint($checkpoint), 'entities/checkpoint');
 
@@ -113,6 +117,17 @@ final class CheckpointController extends Controller
         }
 
         self::write(fn () => $checkpoint->save(), 'Ez a címke vagy QR-kód már egy másik ponthoz tartozik.');
+    }
+
+    /** The photo of photo_media_id is uploaded (PUT /media/{id}), with this checkpoint as its owner. */
+    private static function hasPhoto(Checkpoint $checkpoint): bool
+    {
+        return Media::query()
+            ->whereKey($checkpoint->photo_media_id)
+            ->where('owner_type', Checkpoint::class)
+            ->where('owner_id', $checkpoint->id)
+            ->whereNotNull('uploaded_at')
+            ->exists();
     }
 
     /** @return Builder<Checkpoint> */

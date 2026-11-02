@@ -27,15 +27,16 @@ src/
   Support/              # Table (tábla-előtag), Uuid (UUIDv7), Time (UTC, ISO 8601 ezredmásodperccel)
   Auth/                 # TokenGuard ("waypost" guard), Caller (a kérés hívója), Gate + Policies/ (a csomag saját gate-je)
   Http/                 # ErrorRenderer (hibaformátum), Entities (a rekordok API-alakja, a pullé is), Exceptions/ApiException
-    Middleware/         # FormatApiResponse, Authenticate, HandleIdempotencyKey, ValidateSchema
+    Middleware/         # FormatApiResponse, Authenticate, ParseMultipartBody, HandleIdempotencyKey, ValidateSchema
     Controllers/        # Controller (alaposztály: newId, write, invalid …), Concerns/AssignsPins, a végpontok
   Validation/           # SchemaValidator (opis/json-schema, magyar üzenetek mezőnként)
   Jobs/                 # PruneIdempotencyKeys (óránként ütemezve)
   Schedule/             # TimeLimit (az időkeret alapértéke); a menetrend-kibontás az M6-ban
   Sync/                 # Pull (a pull egy lapja: láthatóság, deleted, reset), PullCursor
-  Chain/ Reports/ Mail/ # a későbbi feladatokban
+  Chain/                # CanonicalJson, EntryHash (HMAC), ChainProcessor (a push), Projector (vetületek), ServerFlags, TrustedTime
+  Reports/ Mail/        # a későbbi feladatokban
 resources/views/        # e-mail és PDF sablonok (M6)
-tests/                  # Pest: Unit/, Feature/ (Api/: az API-keret), Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand(), toMatchSchema(), supervisorToken(), deviceToken(), supervisorOf(), callApi(), requestApi(), pullAs()
+tests/                  # Pest: Unit/, Feature/ (Api/: az API-keret), Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand(), toMatchSchema(), supervisorToken(), deviceToken(), supervisorOf(), callApi(), requestApi(), pullAs(), pushAs(), uploadMedia(), jpegBytes(); Fixtures/ChainBuilder: érvényesen aláírt lánc
   Install/              # InstallTestCase: workbench nélküli alkalmazás, mint a composer require után
 scripts/install-smoke.sh  # telepítés egy friss laravel/laravel 13-ba (Docker, hálózat kell)
 workbench/              # Testbench workbench: routes/web.php (állapotoldal), database/seeders (demóadat)
@@ -59,6 +60,8 @@ A gyökérnévtér `Waypost\` (`src/`), és a sémacsomagé `Waypost\Schema\` �
 - API-útvonal: a `routes/api.php`-ba, middleware-sorrend: `Authenticate::using(...)` (`supervisor` / `device` / `acting`), `ThrottleRequests::using('waypost')`, író kérésnél `HandleIdempotencyKey`, törzzsel `ValidateSchema::using('api/…request')`. A hibát `ApiException` (vagy Laravel-kivétel) jelzi, a választ az `ErrorRenderer` formázza; a controller (a `Http\Controllers\Controller` leszármazottja) tömböt ad vissza `server_time` nélkül (az `FormatApiResponse` teszi bele), létrehozáskor `self::created()` (201). A rekord a válaszban mindig a `Waypost\Http\Entities` alakjában (az entitássémáé, a pullé is); útvonal-paraméter `whereUuid`-dal. Jogosultság: a csomag `Waypost\Auth\Gate`-je a `Caller`-rel (nem a gazda `Gate` facade-ja), a policy-k a `src/Auth/Policies` alatt; a telephelyszűrés a `Caller::siteIds()` szerint. A válasz tesztje: `expect($response)->toMatchSchema('api/…')`; kérés a tesztben: `callApi($method, $path, $supervisor, $body, phone: $device)`, más fejlécekkel `requestApi()`, pull: `pullAs($userOrDevice, $cursor)` (az utolsó `Pull::SETTLE_MS` változásai még nem jönnek, a teszt utazzon előre); új útvonal a `tests/Feature/Api/EndpointsTest.php` listájába is; próba-útvonal: `WaypostServiceProvider::apiRoutes(fn () => …)`.
 - Artisan-parancs kimenete magyar; a `$this->components->info()` pontot tesz a végére, ezért parancsjavaslattal ne végződjön az üzenet. A tesztben `artisanCommand()` (a `Pest\Laravel\artisan()` típusa `PendingCommand|int`).
 - Lebegőpontos szám a láncolt adatban sehol; a koordináta `lat_e7` / `lng_e7`, a pontosság `accuracy_dm` (egészek).
+- Lánc: csak a `ChainProcessor` ír a `chain_entries`-be és a `devices.last_seq` / `last_hash`-be, zárolt tranzakcióban. A vetületet csak a `Projector` írja, idempotensen, és nem függhet a bejegyzések sorrendjétől (ismeretlen hivatkozásnál `false`, a következő push újrapróbálja). A vetület ideje `TrustedTime::of()`, nem a `device_time`. A `chain_entries.flags` csak a szerver jelöléseit tartalmazza (`ChainFlag`).
+- Lekérdezési feltételbe ezredmásodperces időt szövegként tegyél (`format(Time::DATABASE_FORMAT)`), vagy hasonlíts PHP-ban: a query builder a `DateTimeInterface`-t másodpercre vágja.
 - A bemenő JSON-t a `waypost/schema` sémái ellenőrzik (opis/json-schema); FormRequest nincs, a controller csak az adatbázisfüggő szabályokat nézi, és magyar hibát ad (`self::invalid()`, `ApiException::conflict()`). Ami csak a tárolt rekorddal együtt dönthető el, azt az entitásséma ellenőrzi mentés előtt (`SchemaValidator::assertValid()`). Ha egy sémamintát PHP-ban is használunk, a PCRE-be `D` módosítóval kerül (`/…$/D`), különben a `$` a záró sortörés előtt is illeszkedik; a teszt a sémafájlból olvasott mintával veti össze (`schemaPattern()`).
 - PHPStan (Larastan) 8-as szint a `src`, `config`, `tests` és `workbench` alatt; `ignoreErrors` csak indokolt, szűk (`identifier` + `path`) kivétellel. A Pest-tesztekben `$this->…` helyett a `Pest\Laravel\…` függvények (`travelTo()`, `actingAs()` …), mert a PHPStan a closure `$this`-ét nem ismeri.
 - Kódstílus: Pint, `per` preset (`pint.json`), `declare(strict_types=1)` minden fájlban.

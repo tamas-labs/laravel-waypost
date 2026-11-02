@@ -4,7 +4,7 @@ A Waypost őrjárat-rendszer backendje Laravel 13 csomagként. Egy meglévő Lar
 
 A csomag a gazda-alkalmazás tábláihoz nem nyúl: minden táblája `waypost_` előtagú, a tokenjei is saját táblában vannak.
 
-**Állapot:** az M2 mérföldkő (alap backend) kész. A push, a média és a láncellenőrzés (M4), valamint a jelentések, a figyelmeztetések és az adatmegőrzés (M6) még hátravan, lásd a [feladatlistát](../waypost/docs/tasks.md).
+**Állapot:** az M2 mérföldkő (alap backend) és az M4 backendrésze (push, média, láncellenőrzés, vetületek) kész. A jelentések, a figyelmeztetések és az adatmegőrzés (M6) még hátravan, lásd a [feladatlistát](../waypost/docs/tasks.md).
 
 ## Követelmények
 
@@ -70,6 +70,9 @@ A kérések és válaszok pontos alakját a `waypost-schema` JSON Schemái rögz
 | `POST /auth/login` | token nélkül |
 | `POST /auth/logout` | supervisor |
 | `POST /devices/enroll` | supervisor (a saját tokenjével) |
+| `POST /sync/push` | telefon |
+| `POST /sync/push-final` | visszavont telefon, a lezárásig |
+| `PUT /media/{id}` | a bejegyzés fotója: a telefon (visszavontan a lezárásig); a pont fotója: supervisor |
 | `GET /sync/pull` | supervisor vagy telefon |
 | `sites`, `sites/{id}/users`, `users`, `checkpoints`, `routes`, `routes/{id}/versions`, `schedules`, `report-subscriptions` (CRUD) | supervisor, vagy telefon `X-Acting-User`-rel |
 

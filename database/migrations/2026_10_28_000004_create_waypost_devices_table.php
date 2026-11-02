@@ -21,6 +21,8 @@ return new class extends Migration {
             $table->dateTime('enrolled_at', 3);
             $table->dateTime('revoked_at', 3)->nullable();
             $table->dateTime('last_seen_at', 3)->nullable();
+            // A revoked device may upload until it closes its upload (POST /sync/push-final with done: true).
+            $table->dateTime('upload_closed_at', 3)->nullable();
             $table->unsignedBigInteger('last_seq')->default(0);
             $table->char('last_hash', 64)->nullable();
             $table->datetimes(3);

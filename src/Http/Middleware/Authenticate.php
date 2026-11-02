@@ -23,10 +23,11 @@ use Waypost\Support\Uuid;
  * the route accepts (Authenticate::using()):
  * - "supervisor": a supervisor token (supervisor ability);
  * - "device": a device token (device ability), without X-Acting-User;
- * - "acting": a device token with X-Acting-User, the ID of a supervisor assigned to the device's site.
+ * - "acting": a device token with X-Acting-User, the ID of a supervisor assigned to the device's site;
+ * - "revoked": next to "device", the token of a revoked device, without X-Acting-User, until it closes its upload.
  *
- * No valid token: unauthenticated (401). A revoked device: device_revoked (401), whatever the route. A token the
- * route does not accept, or an X-Acting-User the route or the token does not allow: forbidden (403).
+ * No valid token: unauthenticated (401). A revoked device: device_revoked (401), on every route but its last upload's.
+ * A token the route does not accept, or an X-Acting-User the route or the token does not allow: forbidden (403).
  */
 final readonly class Authenticate implements AuthenticatesRequests
 {
@@ -35,6 +36,8 @@ final readonly class Authenticate implements AuthenticatesRequests
     public const string DEVICE = 'device';
 
     public const string ACTING = 'acting';
+
+    public const string REVOKED = 'revoked';
 
     public const string ACTING_USER_HEADER = 'X-Acting-User';
 
@@ -81,7 +84,11 @@ final readonly class Authenticate implements AuthenticatesRequests
     /** @param  list<string>  $callers */
     private function deviceCaller(Request $request, Device $device, PersonalAccessToken $token, array $callers): Caller
     {
-        if ($device->revoked_at !== null) {
+        if ($device->revoked_at !== null && (
+            !in_array(self::REVOKED, $callers, true)
+            || $device->upload_closed_at !== null
+            || $request->headers->has(self::ACTING_USER_HEADER)
+        )) {
             throw ApiException::deviceRevoked();
         }
         if (!$token->can(self::DEVICE)) {

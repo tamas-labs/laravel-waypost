@@ -15,6 +15,7 @@ use Waypost\Schema\Paths;
 use Waypost\Tests\InstallTestCase;
 use Waypost\Tests\TestCase;
 use Waypost\Validation\SchemaValidator;
+use Illuminate\Http\UploadedFile;
 
 use function Pest\Laravel\artisan;
 use function Pest\Laravel\call;
@@ -164,4 +165,50 @@ function pullAs(User|Device $caller, ?string $cursor = null): TestResponse
     $query = $cursor === null ? '' : '?cursor=' . rawurlencode($cursor);
 
     return requestApi('GET', "sync/pull{$query}", ['Authorization' => "Bearer {$token}"]);
+}
+
+/**
+ * POST /sync/push (or push-final with $done) with the device's token.
+ *
+ * @param  list<array<string, mixed>>  $entries
+ * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+ */
+function pushAs(Device $device, array $entries, ?bool $done = null): TestResponse
+{
+    $body = ['device_id' => $device->id, 'entries' => $entries];
+    if ($done !== null) {
+        $body['done'] = $done;
+    }
+
+    return requestApi('POST', $done === null ? 'sync/push' : 'sync/push-final', ['Authorization' => 'Bearer ' . deviceToken($device)], $body);
+}
+
+/** The bytes of a file that fileinfo recognises as a JPEG; $seed makes it unique. */
+function jpegBytes(string $seed = 'a'): string
+{
+    return "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00{$seed}\xFF\xD9";
+}
+
+/**
+ * PUT /media/{id} with a multipart body, as the framework holds it after ParseMultipartBody (the real parsing needs a
+ * server: scripts/install-smoke.sh).
+ *
+ * @param  array<string, string>  $fields
+ * @param  array<string, string>  $headers
+ * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+ */
+function uploadMedia(string $id, array $fields, array $headers, ?string $bytes = null): TestResponse
+{
+    $files = [];
+    if ($bytes !== null) {
+        $path = (string) tempnam(sys_get_temp_dir(), 'waypost');
+        file_put_contents($path, $bytes);
+        $files['file'] = new UploadedFile($path, 'photo.jpg', 'image/jpeg', null, true);
+    }
+    $server = ['HTTP_ACCEPT' => 'application/json', 'CONTENT_TYPE' => 'multipart/form-data; boundary=test', 'HTTP_IDEMPOTENCY_KEY' => (string) Str::uuid()];
+    foreach ($headers as $name => $value) {
+        $server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = $value;
+    }
+
+    return call('PUT', "api/waypost/v1/media/{$id}", $fields, [], $files, $server);
 }

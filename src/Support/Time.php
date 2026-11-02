@@ -36,6 +36,17 @@ final class Time
         return CarbonImmutable::now('UTC');
     }
 
+    /** Milliseconds since the Unix epoch. */
+    public static function milliseconds(DateTimeInterface $time): int
+    {
+        return CarbonImmutable::instance($time)->getTimestampMs();
+    }
+
+    public static function fromMilliseconds(int $milliseconds): CarbonImmutable
+    {
+        return CarbonImmutable::createFromTimestampMsUTC($milliseconds);
+    }
+
     /** API text form of an instant, e.g. 2026-10-27T20:00:00.000Z. */
     public static function iso(DateTimeInterface $time): string
     {

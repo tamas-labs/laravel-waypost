@@ -7,8 +7,10 @@ namespace Waypost\Http;
 use DateTimeInterface;
 use LogicException;
 use Waypost\Auth\Caller;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
+use Waypost\Models\Media;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Route;
 use Waypost\Models\RouteVersion;
@@ -173,6 +175,22 @@ final class Entities
             'user_id' => $subscription->user_id,
             'site_id' => $subscription->site_id,
             'frequency' => $subscription->frequency->value,
+        ];
+    }
+
+    /** @return array<string, mixed> entities/media.json: never the storage path */
+    public static function media(Media $media): array
+    {
+        return [
+            'id' => $media->id,
+            'device_id' => $media->device_id,
+            'owner_type' => MediaOwnerType::ofModel($media->owner_type)->value,
+            'owner_id' => $media->owner_id,
+            'sha256' => $media->sha256,
+            'mime' => $media->mime,
+            'size_bytes' => $media->size_bytes,
+            'taken_at' => Time::iso($media->taken_at),
+            'uploaded_at' => $media->uploaded_at === null ? null : Time::iso($media->uploaded_at),
         ];
     }
 

@@ -300,3 +300,59 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
 - **Döntés:** A `tests/Feature/Api/EndpointsTest.php` bejárja a csomag összes (`waypost.*` nevű) útvonalát: a lista pontosan a specifikáció végpontjai; a belépésen kívül mindegyik token nélkül `unauthenticated`; és minden végpontot meghív supervisor tokennel, a telephelyi telefon tokenjével, valamint `X-Acting-User`-rel: amelyik hívót nem fogadja, annak 403, amelyiket igen, az túljut az azonosításon. Egy új útvonalhoz így a teszt listáját és (ha nem konfigurációs) a hívóit is meg kell adni. A végpontok saját tesztjei a válaszokat a sémával vetik össze (`toMatchSchema`).
 - **Indok:** A végpontonkénti tesztek a viselkedést nézik; a mátrix az, ami egy elfelejtett `Authenticate::using(...)`-t vagy egy rossz csoportba tett útvonalat azonnal jelez.
 - **Érintett:** `tests/Feature/Api/EndpointsTest.php`, `tests/Pest.php` (`requestApi()`, `pullAs()`), M2-24.
+
+## 2026-11-01 – A push feldolgozása (M4-02 – M4-04)
+
+- **Kérdés:** Mit jelent pontosan a specifikáció három ellenőrzése, ha a `UNIQUE(device_id, seq)` miatt egy `seq`-hez egy sor tartozhat, és mi történik az elutasított bejegyzésekkel?
+- **Döntés:**
+  - **Kérésszintű hiba (422, semmi nem tárolódik):** a köteg nem szigorúan növekvő `seq` szerint áll; a kérés vagy egy bejegyzés `device_id`-je nem a token eszközéé; sémahiba, több mint 200 bejegyzés.
+  - **Bejegyzésszintű ellenőrzés** `seq` sorrendben, az eszköz sorának zárolása alatt, egy tranzakcióban: `seq` → `chain_gap`, `prev_hash` → `chain_fork`, HMAC → `bad_hmac`. Az elutasított bejegyzés is eltárolódik a `verify_status`-szal, bizonyítékként.
+  - **Egy `seq` helyén:** a várakozó `gap` bejegyzést a szerver újraellenőrzi, amikor sorra kerül. A `fork` és a `bad_hmac` sor addig marad, amíg ugyanarra a `seq`-re új bejegyzés nem érkezik: az új (ha jó, ha nem) lecseréli. Különben aki a tokent ismeri, de a titkot nem, egyetlen hamis bejegyzéssel örökre megállíthatná a láncot. A következmény: a rossz bejegyzés nyoma a jó megérkezésekor eltűnik; ha fontos lesz, a diagnosztikai esemény (Q2) őrizheti meg.
+  - **`last_seq` alatti `seq`:** ugyanaz a lenyomat újra `accepted`; más lenyomat `chain_fork`, és **nem tárolódik**, mert az elfogadott sor marad a helyén. Ha a sort az adatmegőrzés már törölte, a HMAC dönt (`accepted` vagy `bad_hmac`).
+  - **Azonosító-ütközés:** más eszköz bejegyzésének vagy a saját, más `seq`-ű elfogadott bejegyzésnek az ID-ja: `chain_fork`, tárolás nélkül, a meglévő sor érintetlen. A saját, elutasított sor ilyenkor átadja a helyét.
+  - **A köteg menet közben is tölt:** egy elfogadott bejegyzés után a közvetlenül következő várakozó sor azonnal sorra kerül, kivéve ha azt a `seq`-et a köteg még hozza (akkor a kötegbeli az érvényes). A várakozó, de hibásnak bizonyuló sor is a `rejected` listába kerül, és ott megáll a feldolgozás.
+  - **Listák:** az `accepted` a most `ok` bejegyzések ID-ja, a várakozásból most elfogadottaké is. A séma 200 elemre korlátoz, ezért a lista levágódik; a levágott bejegyzés újraküldéskor kap nyugtát, a `last_seq` a valós értéket mutatja.
+  - **`received_at`** az első érkezés ideje: az ugyanazzal a lenyomattal újraküldött, várakozó bejegyzésé nem változik (a `late_sync` ebből számol). A `last_seen_at`, `last_seq`, `last_hash` és `upload_closed_at` írása nem frissíti az `updated_at`-et, hogy a pull ne hozza a telefont változásként.
+  - A kanonikus JSON a `1.0` alakú egész számot `1`-ként írja ki (a `waypost-schema` döntése szerint), minden más lebegőpontos számra és a ±(2⁵³ − 1)-en kívüli egészre kivételt dob; az ilyen bejegyzés `bad_hmac`.
+- **Indok:** A specifikáció sorrendje szerint; a lecserélés az egyetlen mód, ahogy a `UNIQUE(device_id, seq)` és a „hamis bejegyzés nem állíthatja meg a láncot” együtt teljesül.
+- **Érintett:** `src/Chain/ChainProcessor.php`, `PushResult.php`, `CanonicalJson.php`, `EntryHash.php`, `src/Models/ChainEntry.php`, `src/Http/Controllers/SyncController.php`, M4-02, M4-03, M4-04.
+
+## 2026-11-01 – Halasztott vetület: a még ismeretlen hivatkozás (M4-05)
+
+- **Kérdés:** A sorrend push → média → outbox → pull, ezért egy `ok` bejegyzés hivatkozhat olyan konfigurációra, amely még nincs a szerveren (offline betanított pont, offline létrehozott őr). Az idegen kulcs miatt a vetület elbukna, és a 500-as válasz örökre megállítaná az eszköz láncát.
+- **Döntés:** A láncellenőrzés és a vetület külön lépés. Új oszlop: `chain_entries.projected_at`. Az `ok` bejegyzés előrébb viszi a láncot akkor is, ha még nem alkalmazható; a `Projector::apply()` előbb megnézi a hivatkozásokat, és ha valami ismeretlen, nem ír semmit (`false`), a bejegyzés `projected_at = null` marad. Minden push végén az eszköz összes alkalmazatlan bejegyzése újra sorra kerül, `seq` szerint.
+  - **Hatókör:** a műszak és a kör csak ugyanazé az eszközé lehet, a `shift_started.site_id` csak az eszköz telephelye. Ami mégsem az, az örökre `projected_at = null` marad: nem írhat bele egy másik telefon műszakjába, és a láncot sem állítja meg. Törölt (soft delete) őr, pont és menetrend is érvényes hivatkozás.
+  - **A sorrendtől független vetület**, mert egy halasztott bejegyzés később érkezhet: a kör `started_at`-je a legkorábbi leolvasásé, a már zárt kört egy késő leolvasás nem nyitja újra, a már zárt műszak és kör első értékei maradnak.
+  - **A fotó helyőrző sora** a bejegyzés elfogadásakor akkor is létrejön, ha a bejegyzés még nem alkalmazható, mert az app a push után rögtön feltölti a fotót. A `taken_at` a bejegyzés `device_time`-ja, amíg a feltöltés a pontos értéket nem hozza.
+  - **Ismert korlát:** a halasztott bejegyzés csak a következő pushnál kerül vetületbe, addig a jelentésből hiányzik. Az M6-nak a `projected_at = null` sorokat a „nem teljes adat” jelzésbe kell számolnia.
+  - Az időpontok az app `entryTrustedTime` számítása szerint (`Waypost\Chain\TrustedTime`).
+- **Indok:** Egy érvényes, aláírt bejegyzés sosem veszhet el és nem akaszthatja meg a szinkront; a külön újrapróbáló job helyett a következő push elég, mert az app előtérben 5 percenként szinkronizál.
+- **Érintett:** `src/Chain/Projector.php`, `TrustedTime.php`, `ChainProcessor.php`, `database/migrations/…_chain_entries_table.php`, M4-05, M5-02, M6-05.
+
+## 2026-11-01 – A szerver jelölései (M4-06)
+
+- **Kérdés:** Hol tárolódnak a jelölések, és mit nem mond ki a specifikáció a feltételeikről?
+- **Döntés:**
+  - **Tárolás:** a `chain_entries.flags` csak a szerver jelöléseit tartalmazza (`Waypost\Enums\ChainFlag`), az appé a hash-elt payloadban vannak. A `scans.flags` a kettő uniója (előbb az appé), hogy a jelentésnek ne kelljen a láncot olvasnia.
+  - **Határok:** a specifikáció „több mint” és „kevesebb mint” szövege szigorú: pontosan a határon nincs jelölés.
+  - **`time_suspect`:** az elfogadáskor, minden bejegyzéstípusra.
+  - **`far_from_checkpoint`:** a `3 × pontosság` a **leolvasás** pontossága (a specifikáció mondatának alanya), a betanított pont pontossága csak az „50 m alatti” feltételben szerepel. Hiányzó hely vagy pontosság bármelyik oldalon: nincs jelölés. Csak a leolvasásra. Föld-sugár: 6 371 008,8 m.
+  - **`too_fast`:** a kör előző, ponthoz tartozó leolvasásához képest (láncsorrendben; az ismeretlen címke nem számít közte), a `scanned_at` szerint, csak ha a pont a betanított sorrendben pontosan az előző után következik (`position + 1`), és van `walk_time_from_prev_s`.
+  - **`late_sync`:** a zárás ideje csak a `shift_closed` bejegyzésből derül ki, és ennek nagyobb a `seq`-je, mint a műszak többi bejegyzéséé. Ezért a jelölés a zárás feldolgozásakor kerül fel, visszamenőleg: a műszak `seq`-tartományának (`shift_started` … `shift_closed`) minden olyan bejegyzésére, amelynek `received_at`-je 12 óránál többel a zárás után van. Így a körön kívüli leolvasás is megkapja, amelynek nincs műszakazonosítója.
+- **Indok:** A specifikáció *Láncolt napló / Jelölések* és a `waypost-schema` „A `scan` payload belső szabályai” döntése szerint; a visszamenőleges megoldás nem igényel külön oszlopot.
+- **Érintett:** `src/Chain/ServerFlags.php`, `Projector.php`, `src/Enums/ChainFlag.php`, M4-06, M6.
+
+## 2026-11-01 – A fotó feltöltése és a push-final (M4-07, M4-08)
+
+- **Kérdés:** Hogyan ér el a multipart `PUT` a kódig, kié a fotó, és hol tárolódik, hogy a visszavont eszköz lezárta a feltöltését?
+- **Döntés:**
+  - **Bontás:** a `ParseMultipartBody` middleware (`request_parse_body()`) az azonosítás és a throttling után, a `HandleIdempotencyKey` előtt fut, mert a lenyomathoz kellenek a mezők és a fájl. Nem bontható törzs: `400 bad_request`. A PHP feltöltési korlátja fölött: `413 bad_request`. A Pest a kérést kibontva kapja, ezért a valódi bontást a `scripts/install-smoke.sh` próbálja ki, HTTP-n át.
+  - **Ellenőrzés:** a szöveges mezők az `api/media-upload.request` sémán át (a `ValidateSchema` csak JSON-t néz, ezért a controllerből); a típust a fájl tartalma dönti el (fileinfo), csak `image/jpeg`. A lenyomat a megadott mezővel és a sorban rögzítettel is egyezzen.
+  - **Lánc fotója:** sor nélkül `404`, más eszköznek és supervisornak `403`, más tulajdonosra `422`.
+  - **Pont fotója:** csak supervisor (saját token vagy `X-Acting-User`), a telefon önmagában `403`. Ha a pont már létezik, a `CheckpointPolicy::update` dönt (idegen telephelyé: `404`); ha még nem, a feltöltés létrehozza a sort. A `photo_media_id` csak feltöltött, ehhez a ponthoz tartozó fotóra mutathat, különben `422`.
+  - **Tárolás:** `waypost/media/<id>.jpg` a `waypost.storage.disk` lemezen, kifejezetten `private` láthatósággal, mert egy S3-lemez alapból lehet nyilvános. Ismételt feltöltésnél a már fent lévő sor és fájl nem változik.
+  - **`owner_type`:** az oszlopban a modell osztályneve áll (Eloquent morph, globális morph map nélkül, mert az a gazda saját aliasaival ütközhetne), az API nevét a `MediaOwnerType` adja.
+  - **Visszavont eszköz:** az `Authenticate::REVOKED` paraméter engedi át a `POST /sync/push-final` és a `PUT /media/{id}` útvonalon, amíg az új `devices.upload_closed_at` üres; `X-Acting-User`-rel soha. A lezárás után mindkettő `401 device_revoked`. A token ezért megmarad, különben `unauthenticated` lenne a válasz. Az oszlopok (`upload_closed_at`, `projected_at`) a meglévő migrációkba kerültek, mert éles telepítés még nincs.
+  - **Következmény az M4-10-re:** a 4xx válasz is tárolódik az `Idempotency-Key`-hez (M2-12). A bejegyzés elfogadása előtt kapott `404` után a feltöltést **új kulccsal** kell újrapróbálni, különben 24 órán át ugyanazt a `404`-et kapja vissza.
+- **Indok:** A `waypost-schema` 2026-11-01-es döntései szerint; a lezárás külön oszlopa nélkül a `401 device_revoked` és a megmaradó token nem férne össze.
+- **Érintett:** `src/Http/Middleware/ParseMultipartBody.php`, `Authenticate.php`, `src/Http/Controllers/MediaController.php`, `SyncController.php`, `CheckpointController.php`, `src/Enums/MediaOwnerType.php`, `scripts/install-smoke.sh`, M4-07, M4-08, M4-10, M4-11.
