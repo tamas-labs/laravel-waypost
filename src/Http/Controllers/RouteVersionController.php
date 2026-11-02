@@ -54,6 +54,10 @@ final class RouteVersionController extends Controller
     public function store(Request $request, Route $route, Caller $caller): JsonResponse
     {
         $this->gate->authorize('update', $route);
+        // Before checkPoints(): a checkpoint of the version may have been deleted since.
+        if (($existing = $this->existing($request, RouteVersion::class, ['route_id' => $route->id])) !== null) {
+            return self::repeated(self::versionResponse($route, $existing));
+        }
         $input = self::input($request);
         /** @var list<array{checkpoint_id: string, walk_time_from_prev_s?: int|null}> $points */
         $points = $input['checkpoints'];

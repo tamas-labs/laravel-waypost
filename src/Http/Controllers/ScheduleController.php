@@ -48,6 +48,9 @@ final class ScheduleController extends Controller
             self::invalid('route_id', 'Nincs ilyen útvonal.');
         }
         $this->gate->authorize('create', [Schedule::class, $route]);
+        if (($existing = $this->existing($request, Schedule::class, ['route_id' => $route->id])) !== null) {
+            return self::repeated(['schedule' => Entities::schedule($existing)]);
+        }
 
         $schedule = new Schedule([...$input, 'id' => self::newId($request, Schedule::class)]);
         if (!array_key_exists('time_limit_min', $input)) {

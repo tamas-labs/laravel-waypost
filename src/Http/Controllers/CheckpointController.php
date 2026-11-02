@@ -39,6 +39,9 @@ final class CheckpointController extends Controller
     {
         $input = self::input($request);
         $this->gate->authorize('create', [Checkpoint::class, $input['site_id']]);
+        if (($existing = $this->existing($request, Checkpoint::class, ['site_id' => $input['site_id']])) !== null) {
+            return self::repeated(['checkpoint' => Entities::checkpoint($existing)]);
+        }
 
         $checkpoint = new Checkpoint(['id' => self::newId($request, Checkpoint::class)]);
         $checkpoint->fill(array_key_exists('qr_payload', $input) ? $input : [...$input, 'qr_payload' => self::qrPayload($checkpoint->id)]);

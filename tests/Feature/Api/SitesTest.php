@@ -59,13 +59,14 @@ it('creates a site with the defaults and assigns the creator', function (): void
     callApi('GET', 'sites/' . $response->json('site.id'), $supervisor)->assertOk();
 });
 
-it('keeps the id the app generated, and refuses a taken one', function (): void {
+it('keeps the id the app generated, and refuses it to another supervisor', function (): void {
     $supervisor = User::factory()->supervisor()->create();
     $id = Uuid::v7();
 
     callApi('POST', 'sites', $supervisor, ['id' => $id, 'name' => 'Raktár B', 'timezone' => 'UTC'])->assertCreated()->assertJsonPath('site.id', $id);
 
-    $response = callApi('POST', 'sites', $supervisor, ['id' => $id, 'name' => 'Raktár C'])->assertConflict();
+    // The same supervisor again is a repeated create (RepeatedCreateTest).
+    $response = callApi('POST', 'sites', User::factory()->supervisor()->create(), ['id' => $id, 'name' => 'Raktár C'])->assertConflict();
     expect($response)->toMatchSchema('api/error');
     expect($response->json('error'))->toBe([
         'code' => 'conflict',

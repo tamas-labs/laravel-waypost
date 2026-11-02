@@ -37,6 +37,9 @@ final class SiteController extends Controller
         $input = self::input($request);
         self::checkTimezone($input);
         $supervisor = $caller->user ?? throw new LogicException('Only a supervisor creates a site.');
+        if (($existing = $this->existing($request, Site::class)) !== null) {
+            return self::repeated(['site' => Entities::site($existing)]);
+        }
 
         $site = new Site([...$input, 'id' => self::newId($request, Site::class), 'created_by' => $supervisor->id]);
         self::write(function () use ($site, $supervisor): void {

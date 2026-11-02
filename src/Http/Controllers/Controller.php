@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Waypost\Http\Controllers;
 
+use BackedEnum;
 use Closure;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,8 +50,62 @@ abstract class Controller
     }
 
     /**
-     * The id of a new record: the one the client generated (for its outbox), or a new UUIDv7. An id that is
-     * already taken, also by a deleted record, is a conflict.
+     * 200 OK for a create repeated with the same id (existing()): nothing was created now.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected static function repeated(array $data): JsonResponse
+    {
+        return new JsonResponse($data);
+    }
+
+    /**
+     * A create repeated with the same id (spec: Outbox; waypost-schema: the id of the create requests): an earlier
+     * attempt created the record, but the app did not get the response (its Idempotency-Key expired, or it sent a
+     * new key). The record, if it is the same create: it has the request's unchanging fields ($same: its parent,
+     * e.g. site_id, or the role of a user) and the caller sees it (the view of its policy; a model without a policy,
+     * a route version, through the parent in $same that the controller has authorized). The controller answers
+     * with it as it is now (repeated()), and changes nothing: the rest of the body is not compared, the record may
+     * have changed since. Null if the request has no id or the id is new. A deleted record: conflict, telling so;
+     * another one with this id: conflict, as a taken id.
+     *
+     * @template T of Model
+     *
+     * @param  class-string<T>  $model
+     * @param  array<string, mixed>  $same
+     * @return T|null
+     */
+    protected function existing(Request $request, string $model, array $same = []): ?Model
+    {
+        $id = $request->json('id');
+        if (!is_string($id)) {
+            return null;
+        }
+        $record = $model::query()->withoutGlobalScope(SoftDeletingScope::class)->find($id);
+        if (!$record instanceof $model) {
+            return null;
+        }
+
+        foreach ($same as $field => $value) {
+            $actual = $record->getAttribute($field);
+            if (($actual instanceof BackedEnum ? $actual->value : $actual) !== $value) {
+                throw self::idTaken();
+            }
+        }
+        // Before the policy: the caller no longer sees a deleted site.
+        if ($record->getAttribute('deleted_at') !== null) {
+            throw ApiException::conflict('Ezzel az azonosítóval már létrejött egy rekord, de azóta törölték.', ['id' => ['Törölt rekord azonosítója.']]);
+        }
+        if ($this->gate->getPolicyFor($record) !== null && $this->gate->inspect('view', $record)->denied()) {
+            throw self::idTaken();
+        }
+
+        return $record;
+    }
+
+    /**
+     * The id of a new record: the one the client generated (for its outbox), or a new UUIDv7. Called after
+     * existing(), so a taken id, also of a deleted record, is a conflict.
      *
      * @param  class-string<Model>  $model
      */
@@ -60,10 +116,15 @@ abstract class Controller
             return Uuid::v7();
         }
         if (DB::table((new $model())->getTable())->where('id', $id)->exists()) {
-            throw ApiException::conflict('Ezzel az azonosítóval már létezik rekord.', ['id' => ['Foglalt azonosító.']]);
+            throw self::idTaken();
         }
 
         return $id;
+    }
+
+    private static function idTaken(): ApiException
+    {
+        return ApiException::conflict('Ezzel az azonosítóval már létezik rekord.', ['id' => ['Foglalt azonosító.']]);
     }
 
     /** A UUIDv7 query parameter (e.g. ?site_id=), null if absent. */

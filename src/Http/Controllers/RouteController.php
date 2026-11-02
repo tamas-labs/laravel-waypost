@@ -27,6 +27,9 @@ final class RouteController extends Controller
     {
         $input = self::input($request);
         $this->gate->authorize('create', [Route::class, $input['site_id']]);
+        if (($existing = $this->existing($request, Route::class, ['site_id' => $input['site_id']])) !== null) {
+            return self::repeated(['route' => Entities::route($existing)]);
+        }
 
         $route = Route::query()->create([...$input, 'id' => self::newId($request, Route::class)]);
 

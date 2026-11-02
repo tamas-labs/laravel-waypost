@@ -54,6 +54,10 @@ final class UserController extends Controller
         /** @var list<string> $siteIds */
         $siteIds = $input['site_ids'];
         $this->gate->authorize('create', [User::class, $siteIds]);
+        // Without the PIN: the server knows only its hash.
+        if (($existing = $this->existing($request, User::class, ['role' => $input['role']])) !== null) {
+            return self::repeated(self::userResponse($existing, $caller));
+        }
         self::checkEmail($input['email'] ?? null);
 
         $user = new User([...Arr::except($input, ['site_ids', 'pin']), 'id' => self::newId($request, User::class)]);

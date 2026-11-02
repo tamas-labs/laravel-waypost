@@ -38,6 +38,11 @@ final class ReportSubscriptionController extends Controller
     {
         $input = self::input($request);
         $this->gate->authorize('create', [ReportSubscription::class, $input['site_id']]);
+        // Before the checks of the user: they may have been detached from the site since (and the subscription deleted).
+        $existing = $this->existing($request, ReportSubscription::class, ['user_id' => $input['user_id'], 'site_id' => $input['site_id']]);
+        if ($existing !== null) {
+            return self::repeated(['report_subscription' => Entities::reportSubscription($existing)]);
+        }
         $user = User::query()->find($request->string('user_id')->toString());
         if ($user === null || $this->gate->inspect('view', $user)->denied()) {
             self::invalid('user_id', 'Nincs ilyen felhasználó.');
