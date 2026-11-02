@@ -15,6 +15,7 @@ use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\IdempotencyKey;
 use Waypost\Models\Incident;
+use Waypost\Models\DeviceDiagnostic;
 use Waypost\Models\Media;
 use Waypost\Models\PersonalAccessToken;
 use Waypost\Models\Report;
@@ -66,6 +67,7 @@ it('creates every model with its factory', function (Factory $factory): void {
     'Scan' => fn () => Scan::factory(),
     'Incident' => fn () => Incident::factory(),
     'Media' => fn () => Media::factory(),
+    'DeviceDiagnostic' => fn () => DeviceDiagnostic::factory(),
     'Report' => fn () => Report::factory(),
     'IdempotencyKey' => fn () => IdempotencyKey::factory(),
 ]);

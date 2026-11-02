@@ -59,6 +59,9 @@ Route::post('sync/push', [SyncController::class, 'push'])
 Route::post('sync/push-final', [SyncController::class, 'pushFinal'])
     ->middleware([Authenticate::using(Authenticate::DEVICE, Authenticate::REVOKED), ThrottleRequests::using('waypost'), ...$write('sync-push-final')])
     ->name('sync.push-final');
+Route::post('devices/diagnostics', [DeviceController::class, 'diagnostics'])
+    ->middleware([Authenticate::using(Authenticate::DEVICE, Authenticate::REVOKED), ThrottleRequests::using('waypost'), ...$write('device-diagnostic')])
+    ->name('devices.diagnostics');
 
 // A photo: of a chain entry by its phone (also a revoked one, until it closes its upload), of a checkpoint by a
 // supervisor. A multipart body, so MediaController validates its fields against api/media-upload.request.

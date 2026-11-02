@@ -11,6 +11,7 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 - `POST /sync/push`: a láncbejegyzések fogadása és ellenőrzése (`seq`, `prev_hash`, HMAC), hiánypótlás, vetületek (`shifts`, `rounds`, `scans`, `incidents`, `media`) és a szerver jelölései (`time_suspect`, `too_fast`, `far_from_checkpoint`, `late_sync`).
 - `POST /sync/push-final`: a visszavont telefon utolsó feltöltése kötegekben, a `done: true` zárja le.
 - `PUT /media/{id}`: a fotók feltöltése (multipart, SHA-256-ellenőrzés, privát lemez); a pontok `photo_media_id` mezője.
+- `POST /devices/diagnostics`: az eszköz jelzése az elutasított láncbejegyzéseiről (`device_diagnostics` tábla, Q2).
 
 ### Changed
 

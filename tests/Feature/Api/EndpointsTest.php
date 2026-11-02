@@ -21,6 +21,7 @@ const NOT_CONFIGURATION = [
     'sync.pull' => [Authenticate::SUPERVISOR, Authenticate::DEVICE],
     'sync.push' => [Authenticate::DEVICE],
     'sync.push-final' => [Authenticate::DEVICE],
+    'devices.diagnostics' => [Authenticate::DEVICE],
 ];
 
 /**
@@ -52,7 +53,7 @@ it('has the endpoints of the spec', function (): void {
     expect(array_keys(endpoints()))->toBe([
         'auth.login', 'auth.logout',
         'checkpoints.destroy', 'checkpoints.index', 'checkpoints.show', 'checkpoints.store', 'checkpoints.update',
-        'devices.enroll',
+        'devices.diagnostics', 'devices.enroll',
         'media.upload',
         'report-subscriptions.destroy', 'report-subscriptions.index', 'report-subscriptions.show', 'report-subscriptions.store', 'report-subscriptions.update',
         'routes.destroy', 'routes.index', 'routes.show', 'routes.store', 'routes.update',

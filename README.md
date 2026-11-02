@@ -72,6 +72,7 @@ A kérések és válaszok pontos alakját a `waypost-schema` JSON Schemái rögz
 | `POST /devices/enroll` | supervisor (a saját tokenjével) |
 | `POST /sync/push` | telefon |
 | `POST /sync/push-final` | visszavont telefon, a lezárásig |
+| `POST /devices/diagnostics` | telefon, a visszavont is a lezárásig |
 | `PUT /media/{id}` | a bejegyzés fotója: a telefon (visszavontan a lezárásig); a pont fotója: supervisor |
 | `GET /sync/pull` | supervisor vagy telefon |
 | `sites`, `sites/{id}/users`, `users`, `checkpoints`, `routes`, `routes/{id}/versions`, `schedules`, `report-subscriptions` (CRUD) | supervisor, vagy telefon `X-Acting-User`-rel |

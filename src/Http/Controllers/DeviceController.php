@@ -10,10 +10,11 @@ use Waypost\Auth\Caller;
 use Waypost\Http\Entities;
 use Waypost\Http\Middleware\Authenticate;
 use Waypost\Models\Device;
+use Waypost\Models\DeviceDiagnostic;
 use Waypost\Models\Site;
 use Waypost\Support\Time;
 
-/** POST /devices/enroll (spec: Azonosítás / Telephelyi telefon hozzárendelése). */
+/** POST /devices/enroll (spec: Azonosítás / Telephelyi telefon hozzárendelése), POST /devices/diagnostics. */
 final class DeviceController extends Controller
 {
     /**
@@ -43,5 +44,23 @@ final class DeviceController extends Controller
         });
 
         return ['device' => Entities::device($device), 'token' => $token, 'secret' => $secret];
+    }
+
+    /**
+     * What the calling device reports after the server rejected its chain entries. The same ID again changes nothing.
+     *
+     * @return array<string, never>
+     */
+    public function diagnostics(Request $request, Caller $caller): array
+    {
+        $device = $caller->device ?? throw new LogicException('Only a device reports.');
+        $input = self::input($request);
+        if ($input['device_id'] !== $device->id) {
+            self::invalid('device_id', 'Nem ennek a telefonnak az azonosítója.');
+        }
+
+        DeviceDiagnostic::query()->firstOrCreate(['id' => $input['id']], [...$input, 'device_id' => $device->id, 'received_at' => Time::now()]);
+
+        return [];
     }
 }

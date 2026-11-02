@@ -27,7 +27,7 @@ pest()->extend(InstallTestCase::class)->in('Install');
 const WAYPOST_TABLES = [
     'users', 'personal_access_tokens', 'sites', 'site_user', 'site_user_detachments', 'devices', 'checkpoints', 'routes',
     'route_versions', 'route_version_checkpoints', 'schedules', 'report_subscriptions',
-    'chain_entries', 'shifts', 'rounds', 'scans', 'incidents', 'media', 'reports', 'idempotency_keys',
+    'chain_entries', 'shifts', 'rounds', 'scans', 'incidents', 'media', 'device_diagnostics', 'reports', 'idempotency_keys',
 ];
 
 /**

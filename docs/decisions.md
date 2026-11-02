@@ -356,3 +356,11 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - **Következmény az M4-10-re:** a 4xx válasz is tárolódik az `Idempotency-Key`-hez (M2-12). A bejegyzés elfogadása előtt kapott `404` után a feltöltést **új kulccsal** kell újrapróbálni, különben 24 órán át ugyanazt a `404`-et kapja vissza.
 - **Indok:** A `waypost-schema` 2026-11-01-es döntései szerint; a lezárás külön oszlopa nélkül a `401 device_revoked` és a megmaradó token nem férne össze.
 - **Érintett:** `src/Http/Middleware/ParseMultipartBody.php`, `Authenticate.php`, `src/Http/Controllers/MediaController.php`, `SyncController.php`, `CheckpointController.php`, `src/Enums/MediaOwnerType.php`, `scripts/install-smoke.sh`, M4-07, M4-08, M4-10, M4-11.
+
+## 2026-11-02 – A diagnosztikai jelzés (Q2, M4-09)
+
+- **Kérdés:** Hol tárolódik az eszköz jelzése az elutasított bejegyzéseiről?
+- **Döntés:** Új tábla: `device_diagnostics`, végpont: `POST /devices/diagnostics` (`waypost-schema` 0.4.0). Eszköztokennel, a visszavont eszköz a feltöltése lezárásáig is küldhet. Idegen `device_id`: `422`. Ugyanaz az `id` újra nem változtat semmit (`firstOrCreate`), más eszköz meglévő `id`-jére sem. Az `entry_id` nem idegen kulcs, mert a bejegyzés nem biztos, hogy tárolódott, és később le is cserélődhet. Idegen kulcs csak az eszközre van.
+- **Indok:** A rossz bejegyzés nyoma a jó megérkezésekor eltűnik (lásd „A push feldolgozása”); a jelzés ezt őrzi meg a jelentésnek. A szerver válasza mindig ugyanaz, így az újraküldés biztonságos.
+- **Következmény:** **Az M6-nak** a műszakjelentés lánc-szakaszában ezt is meg kell mutatnia, és az adatmegőrzés jobjának törölnie kell a régi sorokat.
+- **Érintett:** `database/migrations/…_device_diagnostics_table.php`, `src/Models/DeviceDiagnostic.php`, `src/Http/Controllers/DeviceController.php`, `routes/api.php`, M4-09, M6.
