@@ -160,7 +160,7 @@ it('answers conflict while the first request with the key still runs', function 
     write($token)->assertCreated();
     IdempotencyKey::query()->update(['response_status' => null, 'response_body' => null]);
 
-    $response = write($token)->assertStatus(409);
+    $response = write($token)->assertStatus(409)->assertHeader('Retry-After', '5');
 
     expect($response)->toMatchSchema('api/error');
     expect($response->json('error.message'))->toBe('Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.');

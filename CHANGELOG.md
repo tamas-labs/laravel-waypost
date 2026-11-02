@@ -17,3 +17,4 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 - Új oszlopok a meglévő migrációkban: `chain_entries.projected_at`, `devices.upload_closed_at`.
 - A létrehozó végpontok (`POST /sites`, `/checkpoints`, `/routes`, `/routes/{id}/versions`, `/schedules`, `/users`, `/report-subscriptions`) ugyanarra az app által generált `id`-ra idempotensek: a megismételt létrehozás `200` a rekord jelenlegi állapotával, `409` helyett (`waypost-schema` 0.4.0).
+- A még feldolgozás alatt álló `Idempotency-Key` `409`-e `Retry-After: 5` fejlécet kap, így megkülönböztethető a kérés saját ütközésétől.

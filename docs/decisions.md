@@ -372,3 +372,10 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
 - **Indok:** Az outbox a 4xx-et a supervisornak jelzi, és nem küldi újra; egy sikeres létrehozás így hibának látszana. A `200`, mert ez a kérés nem hozott létre semmit. Két, egyszerre futó, különböző kulcsú kérés ugyanazzal az `id`-val továbbra is `409` (az elsődleges kulcs ütközése); az outbox egyszerre egy kérést küld, és a következő pull úgyis elhozza a rekordot.
 - **Következmény az M5-03-ra:** a `200` és a `201` is siker. Új felhasználónál az app maga generálja a PIN-t (a kérésben küldi), mert az ismétlés a szerver generálta PIN-t nem adja vissza.
 - **Érintett:** `src/Http/Controllers/Controller.php`, `SiteController.php`, `CheckpointController.php`, `RouteController.php`, `RouteVersionController.php`, `ScheduleController.php`, `UserController.php`, `ReportSubscriptionController.php`, `tests/Feature/Api/RepeatedCreateTest.php`, M5-02, M5-03, M5-18.
+
+## 2026-11-02 – A még futó kérés jelzése (M5-03)
+
+- **Kérdés:** Ha az app egy hálózati hiba (pl. időtúllépés) után ugyanazzal az `Idempotency-Key`-jel újraküldi a kérést, miközben az első még fut, a válasz `409 conflict`. Az outbox a 4xx-et (a 401 és a 429 kivételével) elutasításnak veszi, és nem küldi újra, így a még futó, valószínűleg sikeres kérés hibának látszana, és a következő próbálkozás sem menne ki. Miből tudja az app, hogy ez nem a kérés saját ütközése (foglalt PIN, címke vagy `id`)?
+- **Döntés:** A még futó kulcs `409`-e `Retry-After: 5` fejlécet kap (`HandleIdempotencyKey::BUSY_RETRY_AFTER_S`); az üzenet és a törzs nem változik. A többi `409`-nek nincs `Retry-After`-je. Az app a `Retry-After`-es `409`-et ugyanazzal a kulccsal később újraküldi.
+- **Indok:** A fejléc a HTTP-ben épp erre való („próbáld újra ennyi idő múlva”), és a hibaformátumot (`api/error.json`) nem kell bővíteni; az üzenet szövegére építeni törékeny lenne.
+- **Érintett:** `src/Http/Middleware/HandleIdempotencyKey.php`, `tests/Feature/Api/IdempotencyTest.php`, M5-03.

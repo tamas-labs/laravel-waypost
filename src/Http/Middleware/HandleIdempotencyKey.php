@@ -17,6 +17,7 @@ use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 use Waypost\Auth\Caller;
+use Waypost\Enums\ErrorCode;
 use Waypost\Http\Exceptions\ApiException;
 use Waypost\Models\Device;
 use Waypost\Models\IdempotencyKey;
@@ -30,7 +31,8 @@ use Waypost\Support\Time;
  * so two callers never share one. Runs after Authenticate.
  *
  * - The same key with another request (method, path, body): validation_failed.
- * - The same key while its first request still runs: conflict (409), to retry later.
+ * - The same key while its first request still runs: conflict (409) with a Retry-After header, which tells it apart
+ *   from a conflict of the request itself: the app's outbox retries it with the same key instead of giving it up.
  * - A server error (5xx) is not stored: the request may be retried with the same key.
  */
 final class HandleIdempotencyKey
@@ -40,6 +42,9 @@ final class HandleIdempotencyKey
     public const string REPLAYED_HEADER = 'Idempotent-Replayed';
 
     public const int TTL_HOURS = 24;
+
+    /** Seconds after which a request whose key is still busy may be retried. */
+    public const int BUSY_RETRY_AFTER_S = 5;
 
     /** @param  Closure(Request): Response  $next */
     public function handle(Request $request, Closure $next): Response
@@ -55,7 +60,7 @@ final class HandleIdempotencyKey
                 $record = DB::transaction(fn (): IdempotencyKey => $this->create($owner, $key, $request, $fingerprint));
             } catch (UniqueConstraintViolationException) {
                 // The same key arrived concurrently.
-                $record = $this->find($owner, $key) ?? throw ApiException::conflict(self::busyMessage());
+                $record = $this->find($owner, $key) ?? throw self::busy();
             }
             if ($record->wasRecentlyCreated) {
                 return $this->run($request, $next, $record);
@@ -157,14 +162,18 @@ final class HandleIdempotencyKey
             throw ValidationException::withMessages([self::HEADER => ['Ezt az Idempotency-Key-t már egy másik kéréshez használtad.']]);
         }
         if ($record->response_status === null || $record->response_body === null) {
-            throw ApiException::conflict(self::busyMessage());
+            throw self::busy();
         }
 
         return JsonResponse::fromJsonString($record->response_body, $record->response_status, [self::REPLAYED_HEADER => 'true']);
     }
 
-    private static function busyMessage(): string
+    private static function busy(): ApiException
     {
-        return 'Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.';
+        return new ApiException(
+            ErrorCode::Conflict,
+            'Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.',
+            headers: ['Retry-After' => (string) self::BUSY_RETRY_AFTER_S],
+        );
     }
 }
