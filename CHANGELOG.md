@@ -6,6 +6,14 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+## [0.1.1] – 2026-11-03
+
+### Fixed
+
+- A csomag gate-je (`Waypost\Auth\Gate`) már nem Laravel-gate, csak becsomagol egyet: a gazda `callAfterResolving(Gate::class, …)` callbackjei (pl. a `spatie/laravel-permission` `before`-callbackje) így nem kerülnek rá, és nem dobnak `TypeError`-t a `Caller`-re (500 minden jogosultság-ellenőrző végponton).
+
+## [0.1.0] – 2026-11-02
+
 ### Added
 
 - `POST /sync/push`: a láncbejegyzések fogadása és ellenőrzése (`seq`, `prev_hash`, HMAC), hiánypótlás, vetületek (`shifts`, `rounds`, `scans`, `incidents`, `media`) és a szerver jelölései (`time_suspect`, `too_fast`, `far_from_checkpoint`, `late_sync`).

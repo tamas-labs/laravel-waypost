@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Auth\Access\Response;
+use Illuminate\Contracts\Auth\Access\Gate as GateContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate as HostGate;
 use Waypost\Auth\Caller;
@@ -167,6 +168,18 @@ it('keeps its policies out of the host application\'s gate', function (): void {
 
     expect(HostGate::getPolicyFor($site))->toBeNull();
     expect(outcome(inspect(supervisorCaller(supervisorOf()), 'view', $site)))->toBe(404);
+});
+
+it('is not given the before-callbacks the host registers on every resolved gate', function (): void {
+    // As spatie/laravel-permission does: the container calls this for every resolved object that is a Gate (instanceof).
+    app()->afterResolving(GateContract::class, function (GateContract $gate): void {
+        $gate->before(fn (Illuminate\Contracts\Auth\Access\Authorizable $user): bool => true);
+    });
+    app()->forgetInstance(Gate::class);
+    $site = Site::factory()->create();
+
+    expect(outcome(inspect(supervisorCaller(supervisorOf()), 'view', $site)))->toBe(404);
+    expect(outcome(inspect(supervisorCaller(supervisorOf($site)), 'view', $site)))->toBe('allow');
 });
 
 it('has a policy for every configurable model', function (): void {
