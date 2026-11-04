@@ -6,6 +6,10 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+## [0.2.0] – 2026-11-04
+
+Az M6 mérföldkő: jelentések, „Nincs adat” figyelmeztetés, adatmegőrzés. Új tábla (`no_data_alerts`) és új követelmény (`ext-gd`): frissítés után `php artisan waypost:install --migrate`.
+
 ### Added
 
 - `GET /reports`: a jelentésarchívum supervisor tokennel, a legújabb időszak elöl, 100-as oldalakban (`next_cursor`), `?site_id=` és `?type=` szűréssel; a tárolt PDF aláírt, lejáró linkjével (`waypost-schema` 0.5.0).
