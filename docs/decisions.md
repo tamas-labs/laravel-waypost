@@ -30,7 +30,7 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
 ## 2026-10-28 – A `waypost/schema` verziója a path repositoryból
 
 - **Kérdés:** A Composer a `../waypost-schema` könyvtárat `dev-main` verziónak látja (a munkakönyvtár nem a `v0.1.0` tagen áll), így a `^0.1` feltétel nem teljesül. Hogyan hivatkozzunk rá?
-- **Döntés:** A `path` repository `options.versions` mezője rögzíti a verziót (`"waypost/schema": "0.1.0"`), a `require` pedig `^0.1`. A sémacsomag új verziójánál (a `package.json` verziójával együtt) ezt is át kell írni. A csomag symlinkként kerül a `vendor/` alá, így a sémák változása azonnal látszik.
+- **Döntés:** A `path` repository `options.versions` mezője rögzíti a verziót (`"waypost/schema": "0.1.0"`), a `require` pedig `^0.1`. A sémacsomag új verziójánál (a `package.json` verziójával együtt) ezt is át kell írni. (2026-11-04 óta a `.waypost-schema-version` adja a verziót, és teszt ellenőrzi, lásd lent.) A csomag symlinkként kerül a `vendor/` alá, így a sémák változása azonnal látszik.
 - **Indok:** Így a `require` a valódi, semver szerinti függést mondja ki, és nem kell `@dev` stabilitás. A gazda-alkalmazásba telepítéskor (M7-01) a `waypost/schema` forrását (VCS-repository vagy privát Packagist) akkor kell eldönteni.
 - **Érintett:** `composer.json`, M2-01, M7-01.
 
@@ -486,3 +486,13 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - **Dátum az elmaradt és hiányos köröknél:** a kör esedékességének a napja, mint a jelöléseknél és az eseményeknél (az éjszaka 01:00-s köre a következő napé); a napi táblázat továbbra is a menetrendi ablak kezdőnapja szerint számol.
 - **Indok:** Egy rosszul betanított pont egy hónap minden leolvasását megjelöli, és ettől egy 128M-os workeren a havi jelentés nem készülne el. A 25 soros darabolás és a felső korlát együtt a legrosszabb esetet is 100 MB körül tartja.
 - **Érintett:** `src/Reports/Pdf.php`, `ReportContent.php`, `resources/views/pdf/period-report.blade.php`, `workbench/database/seeders/ReportDemoSeeder.php`, `workbench/routes/web.php`, `composer.json`, `tests/Feature/ReportDemoSeederTest.php`, `tests/Feature/Reports/PeriodReportTest.php`, M6-12.
+
+## 2026-11-04 – A `waypost/schema` rögzített verziója, CI és a sémaverzió-fejléc
+
+- **Kérdés:** A `waypost-schema` auditja (SCH-001, SCH-002, a döntés a `../waypost-schema/docs/decisions.md`-ben, „CI és a szerződés verziójának rögzítése”) szerint a backend a szomszédos munkapéldányt használja szimlinken, a `composer.json` `options.versions` értékét kézzel kell léptetni, és semmi nem ellenőrzi, hogy a sémakönyvtár tényleg ezen a verzión áll; CI sincs. Hogyan legyen reprodukálható a build, és honnan tudja az app, melyik szerződéssel dolgozik a szerver?
+- **Döntés:**
+  - A várt tag a `.waypost-schema-version` fájlban van (most `v0.6.0`), mint az appban. A `tests/Unit/SchemaPackageTest.php` elbukik, ha a `Waypost\Schema\Paths::VERSION` nem ez, vagy ha a `composer.json` `require` feltétele (`^<major>.<minor>`) és `options.versions` értéke nem ehhez igazodik. Új sémaverziónál mindhárom egyszerre lép, utána `composer update waypost/schema`.
+  - CI (`.github/workflows/ci.yml`) minden `main`-pushra és pull requestre: a csomag és mellé a `tamas-labs/waypost-schema` a rögzített tagen, PHP 8.4 a fejlesztői kép bővítményeivel, MySQL 8.4 szolgáltatás (`waypost_test`), majd `composer install`, `composer test`, `composer analyse`, `composer lint`. A `scripts/install-smoke.sh` (friss Laravel-telepítés) nincs benne, mert Dockerben fut, és a telepítés hálózatfüggő; kézzel futtatandó.
+  - A csomag útvonalainak minden válasza (JSON, hiba, fájl, visszajátszott idempotens válasz) `X-Waypost-Schema: <Paths::VERSION>` fejlécet kap (`FormatApiResponse::SCHEMA_VERSION_HEADER`). Az útvonalon kívüli hibák (nincs ilyen végpont) a gazda kezelőjén mennek át, azokon nincs.
+- **Indok:** A friss checkout csak akkor zöld, ha a séma a várt tagen áll, és ez most teszt bukással derül ki, nem a terepen. A fejléc a sémadöntés szerint az app `__DEV__`-ellenőrzésének forrása. A `vcs` repository helyett a rögzítő fájl, mert a tesztek az `examples/`-t olvassák, ami a kiadott archívumból hiányozna (SCH-011); a gazda-alkalmazás telepítésének forrása (M7-01) ettől függetlenül nyitott.
+- **Érintett:** `.waypost-schema-version`, `composer.json`, `tests/Unit/SchemaPackageTest.php`, `src/Http/Middleware/FormatApiResponse.php`, `tests/Feature/Api/ErrorFormatTest.php`, `.github/workflows/ci.yml`.

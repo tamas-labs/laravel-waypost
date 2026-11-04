@@ -7,7 +7,7 @@ A Waypost backendje Laravel 13 csomagként (`waypost/laravel-waypost`): migráci
 - Fejlesztői specifikáció: [`../waypost/docs/Waypost – fejlesztői specifikáció (1. lépcső).md`](../waypost/docs/Waypost%20–%20fejlesztői%20specifikáció%20(1.%20lépcső).md) – minden viselkedés, szabály, tábla és végpont forrása. Ennek a repónak a fő szakaszai: *Repo és technológiai stack*, *Adatbázis*, *Azonosítás*, *API-szerződés*, *Láncolt napló*, *Jelentések, figyelmeztetések és adatmegőrzés*.
 - Feladatlista: [`../waypost/docs/tasks.md`](../waypost/docs/tasks.md) – ennek a repónak az M2 és az M6 mérföldkő, az M4 és az M5 backendfeladatai és az M7-01 szól. A nyitott kérdések (`Q#`) a fájl végén.
 - Döntések: [`docs/decisions.md`](docs/decisions.md) – ami a specifikációban nincs eldöntve, ide kerül (dátum, kérdés, döntés, indok, érintett).
-- A közös szerződés: `../waypost-schema` (`waypost/schema`, Composer `path` repository) – JSON Schemák, lánc- és menetrend-tesztvektorok, a `Waypost\Schema\Paths` segéd. A sémadöntések a `../waypost-schema/docs/decisions.md`-ben. Ha az API vagy a lánc formátuma változik, **előbb ott** kell módosítani, új verzióval, és csak utána itt.
+- A közös szerződés: `../waypost-schema` (`waypost/schema`, Composer `path` repository) – JSON Schemák, lánc- és menetrend-tesztvektorok, a `Waypost\Schema\Paths` segéd. A sémadöntések a `../waypost-schema/docs/decisions.md`-ben. Ha az API vagy a lánc formátuma változik, **előbb ott** kell módosítani, új verzióval, és csak utána itt. A várt tag a `.waypost-schema-version` fájlban van (a `tests/Unit/SchemaPackageTest.php` veti össze a `Paths::VERSION`-nel és a `composer.json` `require` és `options.versions` értékével): új sémaverziónál mindhármat át kell írni, utána `composer update waypost/schema`. Minden válasz `X-Waypost-Schema` fejlécet kap (`FormatApiResponse`).
 
 ## Szerkezet
 
@@ -85,3 +85,5 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm --service-ports php composer serve` – build, majd a workbench a `http://localhost:8088` címen (`WAYPOST_PORT` felülírja; a 8000 a hoston foglalt).
 - `docker compose run --rm php vendor/bin/testbench <artisan parancs>` – artisan a workbench alkalmazásban.
 - `docker compose down` – leállítás; `down -v` a MySQL-adatokat is törli.
+- CI: `.github/workflows/ci.yml` – `main`-pushra és PR-re: a `waypost-schema` a `.waypost-schema-version` tagjén, `composer test` (MySQL 8.4), `analyse`, `lint`.
+- Ha a hoston a 3306-os port foglalt (más projekt MySQL-je), `WAYPOST_MYSQL_PORT=3307 docker compose …`; a `-T` kapcsoló kell, ha nincs terminál (`docker compose run --rm -T php …`).

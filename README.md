@@ -91,7 +91,7 @@ A pull kurzorral lapoz, oldalanként legfeljebb 500 rekorddal. A `has_more` jelz
 
 ## Fejlesztés
 
-Helyben nem kell PHP és Composer: minden a Docker Compose `php` szolgáltatásában fut. A `waypost-schema` repónak a szomszédos könyvtárban kell lennie.
+Helyben nem kell PHP és Composer: minden a Docker Compose `php` szolgáltatásában fut. A `waypost-schema` repónak a szomszédos könyvtárban kell lennie, a `.waypost-schema-version` fájlban megadott tagen (`git -C ../waypost-schema checkout "$(cat .waypost-schema-version)"`); ha nem azon áll, a `tests/Unit/SchemaPackageTest.php` elbukik.
 
 ```sh
 docker compose run --rm php composer install

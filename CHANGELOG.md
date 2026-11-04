@@ -6,6 +6,15 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+### Added
+
+- `X-Waypost-Schema` fejléc a csomag útvonalainak minden válaszában: a `waypost/schema` verziója (`Paths::VERSION`), amellyel a szerver dolgozik.
+- CI (`.github/workflows/ci.yml`): `composer test` (MySQL 8.4), `composer analyse`, `composer lint`, a `waypost-schema` rögzített tagjén.
+
+### Changed
+
+- A `waypost/schema` függőség `^0.6`; a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal.
+
 ## [0.2.0] – 2026-11-04
 
 Az M6 mérföldkő: jelentések, „Nincs adat” figyelmeztetés, adatmegőrzés. Új tábla (`no_data_alerts`) és új követelmény (`ext-gd`): frissítés után `php artisan waypost:install --migrate`.

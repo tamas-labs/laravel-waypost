@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: waypost_test
+          MYSQL_USER: waypost
+          MYSQL_PASSWORD: waypost
+          MYSQL_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uwaypost -pwaypost"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    defaults:
+      run:
+        working-directory: laravel-waypost
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: laravel-waypost
+      - name: Read the schema version
+        id: schema
+        run: echo "tag=$(cat .waypost-schema-version)" >> "$GITHUB_OUTPUT"
+      # waypost/schema comes from the path repository ../waypost-schema, so the schema goes next to it, at the pinned tag.
+      - uses: actions/checkout@v7
+        with:
+          repository: tamas-labs/waypost-schema
+          ref: ${{ steps.schema.outputs.tag }}
+          path: waypost-schema
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, gd, intl, pcntl, pdo_mysql, pdo_pgsql, zip
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - run: composer test
+        env:
+          DB_HOST: 127.0.0.1
+      - run: composer analyse
+      - run: composer lint

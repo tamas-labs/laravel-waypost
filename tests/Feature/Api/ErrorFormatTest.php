@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Waypost\Enums\ErrorCode;
 use Waypost\Http\Exceptions\ApiException;
+use Waypost\Http\Middleware\FormatApiResponse;
 use Waypost\Models\Site;
 use Waypost\Models\User;
+use Waypost\Schema\Paths;
 use Waypost\Support\Time;
 use Waypost\WaypostServiceProvider;
 
@@ -74,6 +76,16 @@ it('adds server_time first to every JSON response', function (): void {
     expect($response->getContent())->toBe('{"server_time":"2026-10-27T20:00:00.123Z","value":1}');
     expect(getJson('api/waypost/v1/_test/empty')->getContent())->toBe('{"server_time":"2026-10-27T20:00:00.123Z"}');
 });
+
+it('tells the schema version in every response of its routes', function (string $uri, int $status): void {
+    getJson("api/waypost/v1/_test/{$uri}")->assertStatus($status)->assertHeader(FormatApiResponse::SCHEMA_VERSION_HEADER, Paths::VERSION);
+})->with([
+    'JSON' => ['ok', 200],
+    'empty' => ['empty', 200],
+    'error' => ['forbidden', 403],
+    'validation_failed' => ['validation', 422],
+    'unexpected error' => ['crash', 500],
+]);
 
 it('answers every error code with its status, in the error format', function (string $uri, ErrorCode $code, int $status, string $message): void {
     travelTo(Time::fromIso('2026-10-27T20:00:00.000Z'));
