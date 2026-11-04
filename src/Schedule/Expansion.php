@@ -122,12 +122,23 @@ final class Expansion
             return min($candidates);
         }
 
-        // In the gap of a change: the change lies between the two candidates.
-        $from = $wallClock - max($before, $after);
-        foreach ($zone->getTransitions($from, $wallClock - min($before, $after)) ?: [] as $transition) {
-            if ($transition['ts'] > $from) {
-                return $transition['ts'];
+        // In the gap of a change: the change lies between the two candidates. Searched by the offset, not with
+        // getTransitions(), which misses the changes a system time zone database (slim TZif, e.g. PHP on Ubuntu)
+        // only states as a rule.
+        $low = $wallClock - max($before, $after);
+        $high = $wallClock - min($before, $after);
+        $offset = self::offsetAt($low, $zone);
+        if (self::offsetAt($high, $zone) !== $offset) {
+            while ($high - $low > 1) {
+                $middle = intdiv($low + $high, 2);
+                if (self::offsetAt($middle, $zone) === $offset) {
+                    $low = $middle;
+                } else {
+                    $high = $middle;
+                }
             }
+
+            return $high;
         }
 
         throw new InvalidArgumentException("No instant for the wall-clock time {$wallClock} in {$zone->getName()}.");

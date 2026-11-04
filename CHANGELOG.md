@@ -15,6 +15,10 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 - A `waypost/schema` függőség `^0.6`; a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal.
 
+### Fixed
+
+- Menetrend-kibontás (`Expansion::resolve`): a tavaszi óraátállítás nem létező helyi idejénél kivétellel leállt, ha a PHP a rendszer időzóna-adatbázisát használja (pl. Ubuntu, slim TZif), mert a `getTransitions()` ott nem adja vissza a csak szabállyal megadott váltásokat. A váltás pillanatát most az eltolás alapján keresi; a beépített adatbázissal az eredmény ugyanaz. A CI-n derült ki.
+
 ## [0.2.0] – 2026-11-04
 
 Az M6 mérföldkő: jelentések, „Nincs adat” figyelmeztetés, adatmegőrzés. Új tábla (`no_data_alerts`) és új követelmény (`ext-gd`): frissítés után `php artisan waypost:install --migrate`.
