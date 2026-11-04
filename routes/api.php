@@ -8,6 +8,7 @@ use Waypost\Http\Controllers\AuthController;
 use Waypost\Http\Controllers\CheckpointController;
 use Waypost\Http\Controllers\DeviceController;
 use Waypost\Http\Controllers\MediaController;
+use Waypost\Http\Controllers\ReportController;
 use Waypost\Http\Controllers\ReportSubscriptionController;
 use Waypost\Http\Controllers\RouteController;
 use Waypost\Http\Controllers\RouteVersionController;
@@ -45,6 +46,16 @@ Route::middleware([Authenticate::using(Authenticate::SUPERVISOR), ThrottleReques
 
     // With the supervisor's own token only: the site phone itself is what gets enrolled.
     Route::post('devices/enroll', [DeviceController::class, 'enroll'])->middleware($write('devices-enroll'))->name('devices.enroll');
+
+    // The report archive (spec: API-szerződés): only with the supervisor's own token.
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+});
+
+// The files behind the signed URLs of reports and the archive (SignedUrls): no token, so a link of an e-mail opens in a
+// browser; the signature is the permission, an expired or changed one is forbidden.
+Route::middleware([ThrottleRequests::using('waypost')])->group(function (): void {
+    Route::get('media/{media}/file', [MediaController::class, 'file'])->whereUuid('media')->name('media.file');
+    Route::get('reports/{report}/file', [ReportController::class, 'file'])->whereUuid('report')->name('reports.file');
 });
 
 // The site phone, or a supervisor's own phone (spec: Szinkron protokoll / Pull).

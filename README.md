@@ -48,6 +48,7 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 | `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, e-mail-címenként és IP-címenként |
 | `WAYPOST_TABLE_PREFIX` | `waypost_` | a csomag tábláinak előtagja; csak az első migráció előtt változtasd |
 | `WAYPOST_DISK` | `local` | a fotók és a PDF-jelentések tárhelye; privát disk legyen |
+| `WAYPOST_REPORT_URL_TTL_MIN` | `60` | a jelentésarchívum (`GET /reports`) letöltési linkjének élettartama percben; a fotók linkje az adatmegőrzés végéig él |
 | `WAYPOST_QUEUE_CONNECTION`, `WAYPOST_QUEUE` | az alkalmazásé, `default` | a csomag queue-ja |
 | `WAYPOST_MAIL_FROM_ADDRESS`, `WAYPOST_MAIL_FROM_NAME` | az alkalmazás `mail.from`-ja, `Waypost` | a jelentések és figyelmeztetések feladója |
 

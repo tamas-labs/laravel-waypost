@@ -26,15 +26,16 @@ src/
   Pin/                  # PinHasher (PBKDF2, generálás), PinHash, SitePins (egyediség telephelyen belül)
   Support/              # Table (tábla-előtag), Uuid (UUIDv7), Time (UTC, ISO 8601 ezredmásodperccel)
   Auth/                 # TokenGuard ("waypost" guard), Caller (a kérés hívója), Gate + Policies/ (a csomag saját gate-je)
-  Http/                 # ErrorRenderer (hibaformátum), Entities (a rekordok API-alakja, a pullé is), Exceptions/ApiException
+  Http/                 # ErrorRenderer (hibaformátum), Entities (a rekordok API-alakja, a pullé is), SignedUrls (aláírt fotó- és PDF-linkek), Exceptions/ApiException
     Middleware/         # FormatApiResponse, Authenticate, ParseMultipartBody, HandleIdempotencyKey, ValidateSchema
     Controllers/        # Controller (alaposztály: newId, write, invalid …), Concerns/AssignsPins, a végpontok
   Validation/           # SchemaValidator (opis/json-schema, magyar üzenetek mezőnként)
   Jobs/                 # PruneIdempotencyKeys (óránként ütemezve)
-  Schedule/             # TimeLimit (az időkeret alapértéke); a menetrend-kibontás az M6-ban
+  Schedule/             # Expansion (menetrend → várt körök, DST a Q5 szerint), Deadline (a kör határideje), TimeLimit (az időkeret alapértéke)
   Sync/                 # Pull (a pull egy lapja: láthatóság, deleted, reset), PullCursor
   Chain/                # CanonicalJson, EntryHash (HMAC), ChainProcessor (a push), Projector (vetületek), ServerFlags, TrustedTime
-  Reports/ Mail/        # a későbbi feladatokban
+  Reports/              # Summarizer → Summary (egy időszak jelentésadata: RoundRow, RoundOutcome, IncompleteReason), Retention (megőrzési idő)
+  Mail/                 # a későbbi feladatokban
 resources/views/        # e-mail és PDF sablonok (M6)
 tests/                  # Pest: Unit/, Feature/ (Api/: az API-keret), Fixtures/ (csak tesztben használt modellek); Pest.php: schema(), schemaPattern(), WAYPOST_TABLES, artisanCommand(), toMatchSchema(), supervisorToken(), deviceToken(), supervisorOf(), callApi(), requestApi(), pullAs(), pushAs(), uploadMedia(), jpegBytes(); Fixtures/ChainBuilder: érvényesen aláírt lánc
   Install/              # InstallTestCase: workbench nélküli alkalmazás, mint a composer require után

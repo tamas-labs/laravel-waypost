@@ -48,7 +48,6 @@ it('has the values of the schema', function (string $enum, string $schema, strin
     'TagType' => [TagType::class, 'entities/checkpoint', 'tag_type'],
     'OrderMode' => [OrderMode::class, 'entities/route', 'order_mode'],
     'ScheduleMode' => [ScheduleMode::class, 'entities/schedule', 'mode'],
-    'ReportFrequency' => [ReportFrequency::class, 'entities/report-subscription', 'frequency'],
     'ChainEntryType' => [ChainEntryType::class, 'chain/entry', 'type'],
     'ShiftClosedBy' => [ShiftClosedBy::class, 'chain/payload-shift_closed', 'closed_by'],
     'ScanMethod' => [ScanMethod::class, 'chain/payload-scan', 'method'],
@@ -65,6 +64,10 @@ it('keeps the server flags out of the flags of the hashed payload', function ():
     $payload = schema('chain/payload-scan');
 
     expect(array_intersect(enumValues(ChainFlag::class), $payload['properties']['flags']['items']['enum']))->toBe([]);
+});
+
+it('has the report frequencies of the schema', function (): void {
+    expect(enumValues(ReportFrequency::class))->toBe(schema('common/report-frequency')['enum']);
 });
 
 it('has the error codes of the schema', function (): void {

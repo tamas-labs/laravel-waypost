@@ -6,6 +6,17 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+### Added
+
+- `GET /reports`: a jelentésarchívum supervisor tokennel, a legújabb időszak elöl, 100-as oldalakban (`next_cursor`), `?site_id=` és `?type=` szűréssel; a tárolt PDF aláírt, lejáró linkjével (`waypost-schema` 0.5.0).
+- Aláírt, token nélküli letöltés: `GET /media/{id}/file` (a fotó, az adatmegőrzés végéig) és `GET /reports/{id}/file` (a tárolt jelentés, `waypost.signed_urls.report_ttl_min` percig, alapból 60); a lejárt vagy módosított link `403`.
+- Menetrend-kibontás PHP-ban (`Waypost\Schedule\Expansion`, `Deadline`): ugyanazok a szabályok, mint az appban, a `schedule/test-vectors.json` szerint.
+- Jelentésadat-összesítő (`Waypost\Reports\Summarizer`): egy telephely egy időszakának várt és tényleges körei, elmaradt, hiányos és teljesített körei, műszakjai, jelölései, eseményei, a lánc állapota és a „nem teljes adat” jelzés; az adatmegőrzési idő (`Waypost\Reports\Retention`).
+
+### Changed
+
+- A `waypost/schema` függőség `^0.5`.
+
 ## [0.1.1] – 2026-11-03
 
 ### Fixed

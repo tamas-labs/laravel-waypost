@@ -11,6 +11,7 @@ use Waypost\Enums\MediaOwnerType;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\Media;
+use Waypost\Models\Report;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Route;
 use Waypost\Models\RouteVersion;
@@ -191,6 +192,21 @@ final class Entities
             'size_bytes' => $media->size_bytes,
             'taken_at' => Time::iso($media->taken_at),
             'uploaded_at' => $media->uploaded_at === null ? null : Time::iso($media->uploaded_at),
+        ];
+    }
+
+    /** @return array<string, mixed> entities/report.json: never the recipients or the storage path */
+    public static function report(Report $report): array
+    {
+        return [
+            'id' => $report->id,
+            'site_id' => $report->site_id,
+            'type' => $report->type->value,
+            'period_start' => Time::iso($report->period_start),
+            'period_end' => Time::iso($report->period_end),
+            'generated_at' => Time::iso($report->generated_at),
+            'sent_at' => $report->sent_at === null ? null : Time::iso($report->sent_at),
+            'download' => SignedUrls::report($report),
         ];
     }
 

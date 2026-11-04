@@ -38,6 +38,15 @@ return [
     ],
 
     /*
+    | Signed URLs of the private files (they need no token): a photo's link in a report lives until the data
+    | retention deletes the photo; the link of a stored report file in the report archive (GET /reports) lives
+    | this many minutes.
+    */
+    'signed_urls' => [
+        'report_ttl_min' => (int) env('WAYPOST_REPORT_URL_TTL_MIN', 60),
+    ],
+
+    /*
     | Queue for the package's jobs (chain processing, reports, alerts). A null connection means the
     | application's default queue connection.
     */

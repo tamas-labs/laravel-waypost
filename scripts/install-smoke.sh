@@ -20,7 +20,7 @@ composer create-project --no-interaction --quiet laravel/laravel "$app" '^13.0'
 cd "$app"
 
 step "composer require waypost/laravel-waypost (path repositories)"
-composer config repositories.waypost-schema "{\"type\": \"path\", \"url\": \"$schema_dir\", \"options\": {\"versions\": {\"waypost/schema\": \"0.4.0\"}}}"
+composer config repositories.waypost-schema "{\"type\": \"path\", \"url\": \"$schema_dir\", \"options\": {\"versions\": {\"waypost/schema\": \"0.5.0\"}}}"
 composer config repositories.laravel-waypost "{\"type\": \"path\", \"url\": \"$package_dir\", \"options\": {\"versions\": {\"waypost/laravel-waypost\": \"0.1.0\"}}}"
 composer require --no-interaction --quiet waypost/laravel-waypost:0.1.0
 

@@ -12,9 +12,15 @@ use Waypost\Support\Uuid;
 
 pest()->use(RefreshDatabase::class);
 
-/** Who may call an endpoint (spec: API-szerződés); every other endpoint is configuration: supervisor or acting. */
+/**
+ * Who may call an endpoint (spec: API-szerződés); every other endpoint is configuration: supervisor or acting. No
+ * caller: no token, login and the files behind signed URLs.
+ */
 const NOT_CONFIGURATION = [
     'auth.login' => [],
+    'media.file' => [],
+    'reports.file' => [],
+    'reports.index' => [Authenticate::SUPERVISOR],
     'auth.logout' => [Authenticate::SUPERVISOR],
     'devices.enroll' => [Authenticate::SUPERVISOR],
     'media.upload' => [Authenticate::SUPERVISOR, Authenticate::DEVICE, Authenticate::ACTING],
@@ -54,8 +60,9 @@ it('has the endpoints of the spec', function (): void {
         'auth.login', 'auth.logout',
         'checkpoints.destroy', 'checkpoints.index', 'checkpoints.show', 'checkpoints.store', 'checkpoints.update',
         'devices.diagnostics', 'devices.enroll',
-        'media.upload',
+        'media.file', 'media.upload',
         'report-subscriptions.destroy', 'report-subscriptions.index', 'report-subscriptions.show', 'report-subscriptions.store', 'report-subscriptions.update',
+        'reports.file', 'reports.index',
         'routes.destroy', 'routes.index', 'routes.show', 'routes.store', 'routes.update',
         'routes.versions.index', 'routes.versions.show', 'routes.versions.store',
         'schedules.destroy', 'schedules.index', 'schedules.show', 'schedules.store', 'schedules.update',
@@ -66,7 +73,7 @@ it('has the endpoints of the spec', function (): void {
     ]);
 });
 
-it('needs a token on every endpoint but login', function (): void {
+it('needs a token on every endpoint but login and the signed files', function (): void {
     foreach (endpoints() as $name => [$method, $path, $callers]) {
         if ($callers === []) {
             continue;

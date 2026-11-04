@@ -8,11 +8,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Waypost\Auth\Caller;
 use Waypost\Enums\MediaOwnerType;
 use Waypost\Http\Entities;
 use Waypost\Http\Exceptions\ApiException;
+use Waypost\Http\SignedUrls;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Media;
 use Waypost\Support\Time;
@@ -63,6 +65,22 @@ final class MediaController extends Controller
         }
 
         return ['media' => Entities::media($photo)];
+    }
+
+    /** An uploaded photo, by a signed URL of a report (SignedUrls::photo()). */
+    public function file(Request $request, string $media): StreamedResponse
+    {
+        SignedUrls::assertValid($request);
+        $photo = Media::query()->find($media);
+        $disk = Storage::disk(config('waypost.storage.disk'));
+        if ($photo?->path === null || !$disk->exists($photo->path)) {
+            throw ApiException::notFound();
+        }
+
+        return $disk->response($photo->path, basename($photo->path), [
+            'Content-Type' => $photo->mime ?? self::JPEG,
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
     }
 
     /** The file part: only JPEG, which is what the app saves. Over PHP's upload limit: 413. */
