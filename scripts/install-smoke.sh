@@ -91,5 +91,9 @@ echo "$response" | grep -q ' 200 {"server_time":"[^"]*","media":{"id":"' || fail
 [ -f "storage/app/private/waypost/media/$media_id.jpg" ] || fail "the photo is not on the private disk"
 kill "$serve_pid"
 
+step "Reports: the package's views compile in the host, the due reports are scheduled"
+php artisan view:cache --no-interaction > /dev/null || fail "the package's views do not compile"
+php artisan schedule:list --no-interaction | grep -q 'waypost:send-due-reports' || fail "the due reports are not scheduled"
+
 printf '\nok: waypost/laravel-waypost installed into laravel/laravel %s, %s migrations, 1 supervisor, login and upload work\n' \
     "$(php artisan --version | sed 's/Laravel Framework //')" "$expected"

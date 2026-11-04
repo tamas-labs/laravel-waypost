@@ -12,6 +12,7 @@ use LogicException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
+use Waypost\Chain\TrustedTime;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
@@ -52,10 +53,34 @@ final class Summarizer
 
     public function period(Site $site, string $fromDate, string $toDate, ?CarbonImmutable $now = null): Summary
     {
-        $now ??= Time::now();
+        return $this->summarize($site, $fromDate, $toDate, $now ?? Time::now());
+    }
+
+    /**
+     * The data of a shift report: the shift's rounds, and the expected times without a round while it was open (the
+     * phone did not open them), its incidents and its phone's scans outside a round during it, the chain of its
+     * phone. The period is the shift itself; a shift still open (its phone was replaced) ends with its last entry.
+     */
+    public function shift(Shift $shift, ?CarbonImmutable $now = null): Summary
+    {
+        $site = Site::withTrashed()->findOrFail($shift->site_id);
         $zone = new DateTimeZone($site->timezone);
-        $periodStart = self::midnight($fromDate, $zone);
-        $periodEnd = self::midnight(self::addDays($toDate, 1), $zone);
+        $start = CarbonImmutable::instance($shift->started_at)->utc();
+        $end = $shift->ended_at === null ? self::lastEntryTime($shift) : CarbonImmutable::instance($shift->ended_at)->utc();
+        // A window of the evening before may run into the shift.
+        $fromDate = self::addDays(self::localDate($start, $zone), -1);
+
+        return $this->summarize($site, $fromDate, self::localDate($end, $zone), $now ?? Time::now(), [$shift, $start, $end->max($start)]);
+    }
+
+    /**
+     * @param  array{Shift, CarbonImmutable, CarbonImmutable}|null  $only  a shift report: the shift, its start and its end
+     */
+    private function summarize(Site $site, string $fromDate, string $toDate, CarbonImmutable $now, ?array $only = null): Summary
+    {
+        $zone = new DateTimeZone($site->timezone);
+        $periodStart = $only[1] ?? self::midnight($fromDate, $zone);
+        $periodEnd = $only[2] ?? self::midnight(self::addDays($toDate, 1), $zone);
         // A window is shorter than a day: the rounds of the last day are over by the midnight after the next one.
         $searchEnd = self::midnight(self::addDays($toDate, 2), $zone);
         $searchStart = self::midnight(self::addDays($fromDate, -self::MARGIN_DAYS), $zone);
@@ -139,23 +164,35 @@ final class Summarizer
                 missingCheckpointIds: array_values(array_diff(array_map(strval(...), $points), $scanned)),
             );
         }, $rows);
+        if ($only !== null) {
+            // The shift's rounds, and the times it missed: due while it was open, with no round of any shift.
+            $rounds = array_values(array_filter($rounds, fn (RoundRow $row): bool => $row->round === null
+                ? $row->outcome === RoundOutcome::Missed && $row->scheduledAt->betweenIncluded($periodStart, $periodEnd)
+                : $row->round->shift_id === $only[0]->id));
+        }
         usort($rounds, fn (RoundRow $a, RoundRow $b): int => [Time::milliseconds($a->scheduledAt), $a->routeId, $a->scheduleId]
             <=> [Time::milliseconds($b->scheduledAt), $b->routeId, $b->scheduleId]);
 
-        $periodShifts = $shifts->filter(fn (Shift $shift): bool => $inPeriod($shiftDays[$shift->id]))->values();
+        $periodShifts = $only === null
+            ? $shifts->filter(fn (Shift $shift): bool => $inPeriod($shiftDays[$shift->id]))->values()
+            : $shifts->filter(fn (Shift $shift): bool => $shift->id === $only[0]->id)->values();
         $incidents = Incident::query()->whereIn('shift_id', $periodShifts->modelKeys())->orderBy('occurred_at')->orderBy('id')->get();
         $looseScans = $this->scansOutsideRounds($site, $shifts, $shiftDays, $zone, $searchStart, $searchEnd)
-            ->filter(fn (array $scan): bool => $inPeriod($scan[1]))->map(fn (array $scan): Scan => $scan[0]);
+            ->filter(fn (array $scan): bool => $only === null ? $inPeriod($scan[1]) : $scan[2] === $only[0]->id)
+            ->map(fn (array $scan): Scan => $scan[0])
+            ->sortBy(fn (Scan $scan) => Time::milliseconds($scan->scanned_at))->values();
         $scans = collect($rounds)->flatMap(fn (RoundRow $row): array => $row->scans)->concat($looseScans)
             ->sortBy(fn (Scan $scan) => Time::milliseconds($scan->scanned_at))->values();
 
         $dataEnd = collect($rounds)->reduce(fn (CarbonImmutable $end, RoundRow $row): CarbonImmutable => $row->deadline->max($end), $periodEnd);
-        $devices = $this->devices($site, $periodStart, $dataEnd);
+        $devices = $only === null
+            ? $this->devices($site, $periodStart, $dataEnd)
+            : Device::query()->withTrashed()->whereKey($only[0]->device_id)->get();
         $deviceIds = array_values(array_map(strval(...), $devices->modelKeys()));
 
         return new Summary(
             site: $site,
-            fromDate: $fromDate,
+            fromDate: $only === null ? $fromDate : self::localDate($periodStart, $zone),
             toDate: $toDate,
             periodStart: $periodStart,
             periodEnd: $periodEnd,
@@ -165,12 +202,27 @@ final class Summarizer
             shifts: array_values($periodShifts->sortBy(fn (Shift $shift) => Time::milliseconds($shift->started_at))->all()),
             incidents: array_values($incidents->all()),
             flaggedScans: array_values($scans->filter(fn (Scan $scan): bool => $scan->flags !== [])->all()),
+            scansOutsideRounds: array_values($looseScans->all()),
             badEntries: $this->badEntries($deviceIds, $periodStart, $periodEnd),
             diagnostics: DeviceDiagnostic::query()->whereIn('device_id', $deviceIds)
                 ->where('occurred_at', '>=', self::text($periodStart))->where('occurred_at', '<', self::text($periodEnd))->count(),
             deviceIds: $deviceIds,
             incompleteReasons: $this->incompleteReasons($devices, $rounds, $scans, $incidents, $now, $dataEnd, $searchStart, $searchEnd),
         );
+    }
+
+    /** The end of a shift that never closed: the trusted time of its phone's last accepted entry since it started. */
+    private static function lastEntryTime(Shift $shift): CarbonImmutable
+    {
+        $from = ChainEntry::query()->whereKey($shift->chain_entry_id)->value('seq');
+        $last = ChainEntry::query()
+            ->where('device_id', $shift->device_id)
+            ->where('verify_status', VerifyStatus::Ok->value)
+            ->where('seq', '>=', $from ?? 1)
+            ->orderByDesc('seq')
+            ->first();
+
+        return $last === null ? CarbonImmutable::instance($shift->started_at)->utc() : TrustedTime::of($last);
     }
 
     /**
@@ -205,12 +257,12 @@ final class Summarizer
     }
 
     /**
-     * The scans outside a round of the site's phones around the period, each with its day: that of the phone's
-     * shift it happened in, or its local date.
+     * The scans outside a round of the site's phones around the period, each with its day (that of the phone's
+     * shift it happened in, or its local date) and that shift.
      *
      * @param  Collection<int, Shift>  $shifts
      * @param  array<string, string>  $shiftDays
-     * @return BaseCollection<int, array{Scan, string}>
+     * @return BaseCollection<int, array{Scan, string, string|null}>
      */
     private function scansOutsideRounds(Site $site, Collection $shifts, array $shiftDays, DateTimeZone $zone, CarbonImmutable $searchStart, CarbonImmutable $searchEnd): BaseCollection
     {
@@ -230,7 +282,7 @@ final class Summarizer
                     && Time::milliseconds($shift->started_at) <= $at
                     && ($shift->ended_at === null || $at <= Time::milliseconds($shift->ended_at)));
 
-                return [$scan, $shift === null ? self::localDate($scan->scanned_at, $zone) : $shiftDays[$shift->id]];
+                return [$scan, $shift === null ? self::localDate($scan->scanned_at, $zone) : $shiftDays[$shift->id], $shift?->id];
             })
             ->toBase();
     }
@@ -355,8 +407,9 @@ final class Summarizer
     }
 
     /** The UTC instant of a local date's midnight (by the schedule rules, should midnight not exist). */
-    private static function midnight(string $date, DateTimeZone $zone): CarbonImmutable
+    public static function midnight(string $date, DateTimeZone|string $zone): CarbonImmutable
     {
+        $zone = is_string($zone) ? new DateTimeZone($zone) : $zone;
         $naive = CarbonImmutable::createFromFormat('!Y-m-d', $date, 'UTC') ?: throw new InvalidArgumentException("Not a date: {$date}");
 
         return CarbonImmutable::createFromTimestampUTC(Expansion::resolve($naive->getTimestamp(), $zone));

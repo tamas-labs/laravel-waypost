@@ -12,10 +12,15 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 - Aláírt, token nélküli letöltés: `GET /media/{id}/file` (a fotó, az adatmegőrzés végéig) és `GET /reports/{id}/file` (a tárolt jelentés, `waypost.signed_urls.report_ttl_min` percig, alapból 60); a lejárt vagy módosított link `403`.
 - Menetrend-kibontás PHP-ban (`Waypost\Schedule\Expansion`, `Deadline`): ugyanazok a szabályok, mint az appban, a `schedule/test-vectors.json` szerint.
 - Jelentésadat-összesítő (`Waypost\Reports\Summarizer`): egy telephely egy időszakának várt és tényleges körei, elmaradt, hiányos és teljesített körei, műszakjai, jelölései, eseményei, a lánc állapota és a „nem teljes adat” jelzés; az adatmegőrzési idő (`Waypost\Reports\Retention`).
+- Műszakjelentés: a `shift_closed` feldolgozása indítja (`SendShiftReport`), legfeljebb 30 percig vár a hiányzó fotókra; HTML e-mail a design sablonja szerint; a lecserélt telefon nyitva maradt műszakjáé az utolsó feltöltés lezárásakor megy ki.
+- Napi, heti és havi jelentés: 15 percenként ütemezett job (`SendDueReports`) küldi telephelyenként a helyi 10:00-kor; HTML e-mail, a heti és a havi PDF-fel (dompdf, DejaVu Sans, beágyazott bélyegképek), amely a `waypost/reports` alá is tárolódik a jelentésarchívumnak.
+- Címzettek a `report_subscriptions` szerint (a telephely aktív supervisorai), egy jelentés a `reports` táblába kerül, és nem megy ki kétszer.
+- A sablonok publikálhatók: `vendor:publish --tag=waypost-views`.
 
 ### Changed
 
 - A `waypost/schema` függőség `^0.5`.
+- A PDF-hez a `dompdf/dompdf` közvetlenül (a `barryvdh/laravel-dompdf` helyett), saját beállításokkal; új követelmény az `ext-gd`.
 
 ## [0.1.1] – 2026-11-03
 

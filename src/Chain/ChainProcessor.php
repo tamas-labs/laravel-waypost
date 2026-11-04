@@ -9,9 +9,11 @@ use Waypost\Enums\ChainFlag;
 use Waypost\Enums\ErrorCode;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Http\Exceptions\ApiException;
+use Waypost\Jobs\SendShiftReport;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
 use Waypost\Models\Media;
+use Waypost\Models\Shift;
 use Waypost\Support\Time;
 
 /**
@@ -54,6 +56,8 @@ final readonly class ChainProcessor
             $device->fill(['last_seen_at' => Time::now()]);
             if ($closeUpload) {
                 $device->fill(['upload_closed_at' => Time::now()]);
+                // Replaced during a shift: it never gets its shift_closed, but nothing more comes for it.
+                Shift::query()->where('device_id', $device->id)->whereNull('ended_at')->get()->each(SendShiftReport::after(...));
             }
             $device->save();
 

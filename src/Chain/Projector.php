@@ -8,6 +8,7 @@ use DateTimeInterface;
 use Waypost\Enums\ChainEntryType;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\RoundStatus;
+use Waypost\Jobs\SendShiftReport;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
@@ -25,7 +26,8 @@ use Waypost\Support\Time;
 
 /**
  * Applies a verified chain entry to the projections (shifts, rounds, scans, incidents, media), idempotently by the IDs
- * of its payload; the server's scan flags are decided here, because they need the projections.
+ * of its payload; the server's scan flags are decided here, because they need the projections. A shift's close
+ * dispatches its report (SendShiftReport), after the push's transaction.
  *
  * An entry may refer to something that is not on the server yet: the phone pushes before its outbox (a checkpoint
  * trained offline). apply() then answers false and writes nothing but the media rows, and the entry is applied by a
@@ -106,6 +108,7 @@ final class Projector
         if ($shift->ended_at === null) {
             $shift->update(['ended_at' => TrustedTime::of($entry), 'closed_by' => $entry->payload['closed_by']]);
             $this->flagLateEntries($device, $shift, $entry);
+            SendShiftReport::after($shift);
         }
 
         return true;

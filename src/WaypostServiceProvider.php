@@ -27,6 +27,7 @@ use Waypost\Console\InstallCommand;
 use Waypost\Http\ErrorRenderer;
 use Waypost\Http\Middleware\FormatApiResponse;
 use Waypost\Jobs\PruneIdempotencyKeys;
+use Waypost\Jobs\SendDueReports;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\ReportSubscription;
@@ -50,6 +51,8 @@ final class WaypostServiceProvider extends ServiceProvider
     public const string MIGRATIONS_DIRECTORY = __DIR__ . '/../database/migrations';
 
     public const string ROUTES_FILE = __DIR__ . '/../routes/api.php';
+
+    public const string VIEWS_DIRECTORY = __DIR__ . '/../resources/views';
 
     /** The policies of the package's gate (Waypost\Auth\Gate). */
     public const array POLICIES = [
@@ -91,6 +94,8 @@ final class WaypostServiceProvider extends ServiceProvider
                 $handler->renderable(fn (Throwable $e, Request $request) => $this->app->make(ErrorRenderer::class)->render($e, $request));
             }
         });
+
+        $this->loadViewsFrom(self::VIEWS_DIRECTORY, 'waypost');
 
         $this->defineRateLimits();
 
@@ -156,8 +161,13 @@ final class WaypostServiceProvider extends ServiceProvider
             self::MIGRATIONS_DIRECTORY => database_path('migrations'),
         ], 'waypost-migrations');
 
+        $this->publishes([
+            self::VIEWS_DIRECTORY => resource_path('views/vendor/waypost'),
+        ], 'waypost-views');
+
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->job(new PruneIdempotencyKeys())->hourly()->name('waypost:prune-idempotency-keys');
+            $schedule->job(new SendDueReports())->everyFifteenMinutes()->name('waypost:send-due-reports');
         });
     }
 }

@@ -12,15 +12,12 @@ use Waypost\Enums\RoundStatus;
 use Waypost\Enums\ShiftClosedBy;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
-use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\DeviceDiagnostic;
 use Waypost\Models\Incident;
 use Waypost\Models\Media;
 use Waypost\Models\Round;
 use Waypost\Models\Route;
-use Waypost\Models\RouteVersion;
-use Waypost\Models\RouteVersionCheckpoint;
 use Waypost\Models\Scan;
 use Waypost\Models\Schedule;
 use Waypost\Models\Shift;
@@ -33,89 +30,7 @@ use Waypost\Reports\Summary;
 use Waypost\Support\Table;
 use Waypost\Support\Time;
 
-use function Pest\Laravel\travelTo;
-
 pest()->use(RefreshDatabase::class);
-
-/**
- * A site configured on 2026-10-01: a route trained with two checkpoints, a schedule with the given fields, and (unless
- * $phone is false) a phone.
- *
- * @param  array<string, mixed>  $schedule
- * @return array{site: Site, route: Route, version: RouteVersion, points: list<Checkpoint>, schedule: Schedule, phone: Device|null}
- */
-function patrolledSite(array $schedule, bool $phone = true): array
-{
-    travelTo(CarbonImmutable::parse('2026-10-01T12:00:00Z'));
-    $site = Site::factory()->create();
-    $route = Route::factory()->for($site)->create();
-    $version = RouteVersion::factory()->for($route)->create();
-    $points = [];
-    foreach ([1, 2] as $_) {
-        $checkpoint = Checkpoint::factory()->for($site)->create();
-        RouteVersionCheckpoint::factory()->create(['route_version_id' => $version->id, 'checkpoint_id' => $checkpoint->id]);
-        $points[] = $checkpoint;
-    }
-    $route->update(['current_version_id' => $version->id]);
-
-    return [
-        'site' => $site,
-        'route' => $route,
-        'version' => $version,
-        'points' => $points,
-        'schedule' => Schedule::factory()->for($route)->create($schedule),
-        'phone' => $phone ? Device::factory()->for($site)->create() : null,
-    ];
-}
-
-function shiftOf(Device $phone, string $from, ?string $to = null, ShiftClosedBy $closedBy = ShiftClosedBy::Guard): Shift
-{
-    return Shift::factory()->create([
-        'device_id' => $phone->id,
-        'started_at' => Time::fromIso($from),
-        'ended_at' => $to === null ? null : Time::fromIso($to),
-        'closed_by' => $to === null ? null : $closedBy,
-    ]);
-}
-
-/**
- * A round of the fixture's schedule, with a scan of each given checkpoint (index into the fixture's points).
- *
- * @param  array{version: RouteVersion, schedule: Schedule, points: list<Checkpoint>}  $fixture
- * @param  array<int, string>  $scans  checkpoint index => scanned_at
- */
-function roundOf(Shift $shift, array $fixture, string $at, RoundStatus $status, array $scans = [], ?Schedule $schedule = null): Round
-{
-    $schedule ??= $fixture['schedule'];
-    $round = Round::factory()->create([
-        'shift_id' => $shift->id,
-        'route_version_id' => $fixture['version']->id,
-        'schedule_id' => $schedule->id,
-        'scheduled_at' => Time::fromIso($at),
-        'time_limit_min' => $schedule->time_limit_min,
-        'status' => $status,
-        'started_at' => $scans === [] ? null : Time::fromIso((string) reset($scans)),
-        'finished_at' => in_array($status, [RoundStatus::Open, RoundStatus::InProgress], true) ? null : Time::fromIso($at)->addMinutes(18),
-    ]);
-    $phone = $shift->device ?? throw new LogicException('A shift has its phone.');
-    foreach ($scans as $index => $time) {
-        scanOf($phone, $round, $fixture['points'][$index], $time);
-    }
-
-    return $round;
-}
-
-/** @param  list<string>  $flags */
-function scanOf(Device $phone, ?Round $round, ?Checkpoint $checkpoint, string $at, array $flags = []): Scan
-{
-    return Scan::factory()->create([
-        'round_id' => $round?->id,
-        'checkpoint_id' => $checkpoint?->id,
-        'scanned_at' => Time::fromIso($at),
-        'flags' => $flags,
-        'chain_entry_id' => ChainEntry::factory()->create(['device_id' => $phone->id, 'type' => ChainEntryType::Scan, 'device_time' => Time::fromIso($at), 'projected_at' => Time::fromIso($at)])->id,
-    ]);
-}
 
 function summaryOf(Site $site, string $from, string $to, string $now): Summary
 {

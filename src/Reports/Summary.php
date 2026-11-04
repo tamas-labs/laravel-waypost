@@ -11,8 +11,9 @@ use Waypost\Models\Shift;
 use Waypost\Models\Site;
 
 /**
- * The data of a site's report for a period of local days (Summarizer::period()): the rounds (expected and actual),
- * the shifts, the flags and incidents, the state of the chain, and whether the data may still be incomplete.
+ * The data of a site's report for a period of local days (Summarizer::period()) or for a shift (Summarizer::shift()):
+ * the rounds (expected and actual), the shifts, the flags and incidents, the state of the chain, and whether the data
+ * may still be incomplete.
  */
 final readonly class Summary
 {
@@ -21,16 +22,17 @@ final readonly class Summary
      * @param  list<Shift>  $shifts  whose day is in the period, in time order
      * @param  list<Incident>  $incidents  of those shifts, in time order
      * @param  list<Scan>  $flaggedScans  of the period with a flag (the app's or the server's), in time order
+     * @param  list<Scan>  $scansOutsideRounds  of the period without a round, in time order
      * @param  array<string, int>  $badEntries  chain entries of the period not ok, by verify_status
      * @param  list<string>  $deviceIds  the site's phones the period's data comes from
      * @param  list<IncompleteReason>  $incompleteReasons
      */
     public function __construct(
         public Site $site,
-        /** First and last local day (Y-m-d), inclusive. */
+        /** First and last local day (Y-m-d), inclusive; of a shift: the local dates of its start and end. */
         public string $fromDate,
         public string $toDate,
-        /** Local midnight starting the first day and after the last one, in UTC. */
+        /** Local midnight starting the first day and after the last one, in UTC; of a shift: its start and end. */
         public CarbonImmutable $periodStart,
         public CarbonImmutable $periodEnd,
         /** When the period's data ends: periodEnd, or the latest deadline of its rounds if later. */
@@ -40,6 +42,7 @@ final readonly class Summary
         public array $shifts,
         public array $incidents,
         public array $flaggedScans,
+        public array $scansOutsideRounds,
         public array $badEntries,
         /** The phones' reports of rejected entries (device_diagnostics) in the period. */
         public int $diagnostics,

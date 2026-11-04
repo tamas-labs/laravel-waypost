@@ -1,14 +1,14 @@
 # waypost/laravel-waypost
 
-A Waypost őrjárat-rendszer backendje Laravel 13 csomagként. Egy meglévő Laravel alkalmazásba telepíthető, és a saját tábláival, útvonalaival és parancsaival adja a Waypost API-t: belépés, eszköz-hozzárendelés, konfigurációs CRUD és szinkronizáció (pull).
+A Waypost őrjárat-rendszer backendje Laravel 13 csomagként. Egy meglévő Laravel alkalmazásba telepíthető, és a saját tábláival, útvonalaival és parancsaival adja a Waypost API-t: belépés, eszköz-hozzárendelés, konfigurációs CRUD és szinkronizáció (pull, push, média), valamint az e-mailes jelentéseket.
 
 A csomag a gazda-alkalmazás tábláihoz nem nyúl: minden táblája `waypost_` előtagú, a tokenjei is saját táblában vannak.
 
-**Állapot:** az M2 mérföldkő (alap backend) és az M4 backendrésze (push, média, láncellenőrzés, vetületek) kész. A jelentések, a figyelmeztetések és az adatmegőrzés (M6) még hátravan, lásd a [feladatlistát](../waypost/docs/tasks.md).
+**Állapot:** az M2 mérföldkő (alap backend) és az M4 backendrésze (push, média, láncellenőrzés, vetületek) kész, az M6-ból a jelentések is (műszak, napi, heti, havi). A „Nincs adat” figyelmeztetés és az adatmegőrzés még hátravan, lásd a [feladatlistát](../waypost/docs/tasks.md).
 
 ## Követelmények
 
-- PHP 8.4
+- PHP 8.4, `gd` bővítménnyel (a PDF-jelentések bélyegképeihez)
 - Laravel 13
 - MySQL 8.4 vagy PostgreSQL 16; a telepítési próba SQLite-on is lefut
 - a `waypost/schema` csomag (a közös JSON Schema szerződés, a `waypost-schema` repo)
@@ -35,7 +35,9 @@ php artisan waypost:create-supervisor --name="Kiss Anna" --email=anna@example.co
   - A `vendor:publish --tag=waypost-migrations` helyett ezt használd: az minden futáskor újra publikálná a migrációkat.
 - A `waypost:create-supervisor` létrehozza az első supervisort. A jelszót bekéri, ha nincs megadva.
 
-A csomag egy óránkénti feladatot ütemez: ez törli a lejárt idempotenciakulcsokat. Ehhez a gazda-alkalmazásban futnia kell az ütemezőnek (`php artisan schedule:run` percenként, vagy `schedule:work`).
+A csomag két feladatot ütemez: óránként törli a lejárt idempotenciakulcsokat, 15 percenként pedig elküldi az esedékes napi, heti és havi jelentéseket (telephelyenként a helyi idő szerint 10:00-kor; ami kimaradt, azt legfeljebb 12 órán belül pótolja). Ehhez a gazda-alkalmazásban futnia kell az ütemezőnek (`php artisan schedule:run` percenként, vagy `schedule:work`), és egy queue workernek a csomag queue-ján (`php artisan queue:work`). A műszakjelentés a műszak zárásának feldolgozásakor indul, és legfeljebb 30 percig vár a hiányzó fotókra; a `sync` queue nem tud várni, ott azonnal megy ki.
+
+A jelentések e-mailek, a gazda-alkalmazás levelezőjén (`MAIL_MAILER`) mennek ki; a fotók linkje abszolút, ezért az `APP_URL`-nek a valódi címet kell mutatnia. Az e-mail- és a PDF-sablonok a `vendor:publish --tag=waypost-views` paranccsal publikálhatók és átírhatók.
 
 ## Konfiguráció
 
