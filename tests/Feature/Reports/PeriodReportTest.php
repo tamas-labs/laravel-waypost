@@ -20,6 +20,7 @@ use Waypost\Models\Media;
 use Waypost\Models\Report;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\User;
+use Waypost\Reports\ReportContent;
 use Illuminate\Support\Str;
 use Waypost\Support\Time;
 
@@ -181,6 +182,34 @@ it('sends the monthly report on the 1st for the calendar month before, with its 
         ->and((string) $mail->pdf)->toStartWith('%PDF-')
         ->and(Time::iso($report->period_start))->toBe('2026-09-30T22:00:00.000Z')
         ->and(Time::iso($report->period_end))->toBe('2026-10-31T23:00:00.000Z');
+});
+
+it('counts every flagged scan of a week, lists the first 100, and gives dompdf the memory for the rest', function (): void {
+    $fixture = periodReportSite(ReportFrequency::Weekly);
+    $phone = $fixture['phone'];
+    $shift = shiftOf($phone, '2026-11-03T18:55:00.000Z', '2026-11-03T21:40:00.000Z');
+    $round = roundOf($shift, $fixture, '2026-11-03T19:00:00.000Z', RoundStatus::Completed);
+    // A checkpoint trained at the wrong place: every scan is far from it.
+    for ($i = 0; $i < 120; $i++) {
+        scanOf($phone, $round, $fixture['points'][0], CarbonImmutable::parse('2026-11-03T19:00:00Z')->addSeconds($i * 30)->format('Y-m-d\TH:i:s.v\Z'), ['far_from_checkpoint']);
+    }
+    $limit = (string) ini_get('memory_limit');
+    ini_set('memory_limit', '128M');
+
+    try {
+        travelTo(CarbonImmutable::parse('2026-11-09T09:00:00Z'));
+        app()->call([new SendPeriodReport($fixture['site']->id, ReportFrequency::Weekly, '2026-11-02', '2026-11-08'), 'handle']);
+        expect(ini_get('memory_limit'))->toBe('128M');
+    } finally {
+        ini_set('memory_limit', $limit);
+    }
+
+    $content = sentPeriodMails()[0]->content;
+    expect($content['flags'])->toBe([['label' => 'távol a ponttól', 'count' => 120]])
+        ->and($content['flagged_scans'])->toHaveCount(ReportContent::FLAGGED_SCANS_LISTED)
+        ->and($content['flagged_more'])->toBe(20)
+        ->and((string) sentPeriodMails()[0]->pdf)->toStartWith('%PDF-')
+        ->and(view('waypost::pdf.period-report', $content)->render())->toContain('… és további 20 jelölt leolvasás');
 });
 
 it('tells at the top when the data is not complete yet', function (): void {

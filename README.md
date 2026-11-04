@@ -4,7 +4,7 @@ A Waypost őrjárat-rendszer backendje Laravel 13 csomagként. Egy meglévő Lar
 
 A csomag a gazda-alkalmazás tábláihoz nem nyúl: minden táblája `waypost_` előtagú, a tokenjei is saját táblában vannak.
 
-**Állapot:** az M2 mérföldkő (alap backend) és az M4 backendrésze (push, média, láncellenőrzés, vetületek) kész, az M6-ból a jelentések is (műszak, napi, heti, havi). A „Nincs adat” figyelmeztetés és az adatmegőrzés még hátravan, lásd a [feladatlistát](../waypost/docs/tasks.md).
+**Állapot:** az M2 mérföldkő (alap backend), az M4 backendrésze (push, média, láncellenőrzés, vetületek) és az M6 (jelentések, „Nincs adat” figyelmeztetés, adatmegőrzés) kész, lásd a [feladatlistát](../waypost/docs/tasks.md).
 
 ## Követelmények
 
@@ -35,9 +35,16 @@ php artisan waypost:create-supervisor --name="Kiss Anna" --email=anna@example.co
   - A `vendor:publish --tag=waypost-migrations` helyett ezt használd: az minden futáskor újra publikálná a migrációkat.
 - A `waypost:create-supervisor` létrehozza az első supervisort. A jelszót bekéri, ha nincs megadva.
 
-A csomag két feladatot ütemez: óránként törli a lejárt idempotenciakulcsokat, 15 percenként pedig elküldi az esedékes napi, heti és havi jelentéseket (telephelyenként a helyi idő szerint 10:00-kor; ami kimaradt, azt legfeljebb 12 órán belül pótolja). Ehhez a gazda-alkalmazásban futnia kell az ütemezőnek (`php artisan schedule:run` percenként, vagy `schedule:work`), és egy queue workernek a csomag queue-ján (`php artisan queue:work`). A műszakjelentés a műszak zárásának feldolgozásakor indul, és legfeljebb 30 percig vár a hiányzó fotókra; a `sync` queue nem tud várni, ott azonnal megy ki.
+A csomag négy feladatot ütemez:
 
-A jelentések e-mailek, a gazda-alkalmazás levelezőjén (`MAIL_MAILER`) mennek ki; a fotók linkje abszolút, ezért az `APP_URL`-nek a valódi címet kell mutatnia. Az e-mail- és a PDF-sablonok a `vendor:publish --tag=waypost-views` paranccsal publikálhatók és átírhatók.
+- óránként törli a lejárt idempotenciakulcsokat;
+- 15 percenként elküldi az esedékes napi, heti és havi jelentéseket (telephelyenként a helyi idő szerint 10:00-kor; ami kimaradt, azt legfeljebb 12 órán belül pótolja);
+- 15 percenként elküldi a „Nincs adat” figyelmeztetéseket (a telephely supervisorainak, menetrendi ablakonként egyszer);
+- naponta 03:30-kor törli a megőrzési időnél (31, havi jelentésnél 62 nap) régebbi adatokat, fotókat és tárolt PDF-eket.
+
+Ehhez a gazda-alkalmazásban futnia kell az ütemezőnek (`php artisan schedule:run` percenként, vagy `schedule:work`), és egy queue workernek a csomag queue-ján (`php artisan queue:work`). A műszakjelentés a műszak zárásának feldolgozásakor indul, és legfeljebb 30 percig vár a hiányzó fotókra; a `sync` queue nem tud várni, ott azonnal megy ki.
+
+A jelentések e-mailek, a gazda-alkalmazás levelezőjén (`MAIL_MAILER`) mennek ki; a fotók linkje abszolút, ezért az `APP_URL`-nek a valódi címet kell mutatnia. Az e-mail- és a PDF-sablonok a `vendor:publish --tag=waypost-views` paranccsal publikálhatók és átírhatók. A heti és a havi PDF készítésének idejére a csomag a PHP `memory_limit`-jét legalább 512M-ra emeli (a dompdf a teljes oldalképet a memóriában tartja), utána visszaállítja.
 
 ## Konfiguráció
 
@@ -93,5 +100,7 @@ docker compose run --rm php composer analyse   # PHPStan (Larastan, 8-as szint)
 docker compose run --rm php composer lint      # Pint
 docker compose run --rm --service-ports php composer serve   # demóadatokkal: http://localhost:8088
 ```
+
+A jelentések átnézéséhez a futó `serve` mellett, egy másik terminálban: `docker compose run --rm php composer seed-reports` (40 éjszaka adata egy telephelyen, kb. 15 s). Utána a `http://localhost:8088/reports` oldalról nyílnak az e-mailek és a PDF-ek, ahogy most kimennének (küldés nélkül).
 
 A teljes parancslistát (PostgreSQL-futtatás, telepítési próba, workbench) és a kódolási szabályokat a [CLAUDE.md](CLAUDE.md) tartalmazza. A specifikációban nem rögzített döntések a [docs/decisions.md](docs/decisions.md)-ben vannak.

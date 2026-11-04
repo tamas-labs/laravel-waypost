@@ -3,7 +3,12 @@
   photos embedded (data URIs), so the PDF stays evidence after the retention deletes them. DejaVu Sans has every
   Hungarian letter (ő, ű), the PDF core fonts do not.
 --}}
-@php $S = \Waypost\Reports\Palette::STATUS; @endphp
+@php
+  $S = \Waypost\Reports\Palette::STATUS;
+  // dompdf lays out a long table in more than linear memory: the long lists go in tables of $chunk rows, with fixed
+  // column widths so that they line up as one.
+  $chunk = 25;
+@endphp
 <!DOCTYPE html>
 <html lang="hu">
 <head>
@@ -19,13 +24,15 @@
   .band span { float: right; color: #9AA6BF; }
   .warn { background: #FBE0E1; padding: 7pt 10pt; margin-top: 8pt; }
   table { width: 100%; border-collapse: collapse; }
+  table.fixed { table-layout: fixed; }
   th { background: #EEF2F8; color: #4F5B73; font-size: 7.5pt; text-transform: uppercase; text-align: left; padding: 4pt 6pt; }
   td { border-top: 0.5pt solid #DCE3EE; padding: 4pt 6pt; vertical-align: top; }
   .tiles td { border: none; padding: 6pt 8pt; width: 20%; }
   .tiles .n { font-size: 16pt; font-weight: bold; }
   .badge { padding: 1pt 5pt; font-size: 8pt; font-weight: bold; }
   .incident { border: 0.5pt solid #DCE3EE; padding: 6pt 8pt; margin-bottom: 6pt; page-break-inside: avoid; }
-  .incident img { width: 120pt; margin: 4pt 4pt 0 0; }
+  /* Floated: dompdf puts a line of several inline images a line too high, over the note. */
+  .incident img { float: left; width: 120pt; margin: 4pt 4pt 0 0; }
   tr { page-break-inside: avoid; }
 </style>
 </head>
@@ -66,19 +73,21 @@
 
   <h2>Elmaradt és hiányos körök</h2>
   @if(count($problem_rounds))
-  <table>
-    <tr><th>Nap</th><th>Kör</th>@if($show_route)<th>Útvonal</th>@endif<th>Állapot</th><th>Pontok</th><th>Hiányzó pontok</th></tr>
-    @foreach($problem_rounds as $r)
+  @foreach(array_chunk($problem_rounds, $chunk) as $rows)
+  <table class="fixed">
+    @if($loop->first)<tr><th style="width:15%;">Nap</th><th style="width:8%;">Kör</th>@if($show_route)<th style="width:17%;">Útvonal</th>@endif<th style="width:14%;">Állapot</th><th style="width:9%;">Pontok</th><th>Hiányzó pontok</th></tr>@endif
+    @foreach($rows as $r)
     <tr>
-      <td>{{ $r['day'] }}</td>
-      <td><b>{{ $r['time'] }}</b></td>
-      @if($show_route)<td>{{ $r['route'] }}</td>@endif
-      <td><span class="badge" style="background:{{ $S[$r['status']]['bg'] }}; color:{{ $S[$r['status']]['fg'] }};">{{ $r['status_text'] }}</span></td>
-      <td>{{ $r['done'] }}/{{ $r['total'] }}</td>
+      <td style="width:15%;">{{ $r['day'] }}</td>
+      <td style="width:8%;"><b>{{ $r['time'] }}</b></td>
+      @if($show_route)<td style="width:17%;">{{ $r['route'] }}</td>@endif
+      <td style="width:14%;"><span class="badge" style="background:{{ $S[$r['status']]['bg'] }}; color:{{ $S[$r['status']]['fg'] }};">{{ $r['status_text'] }}</span></td>
+      <td style="width:9%;">{{ $r['done'] }}/{{ $r['total'] }}</td>
       <td class="muted">{{ $r['missing'] !== '' ? $r['missing'] : '–' }}</td>
     </tr>
     @endforeach
   </table>
+  @endforeach
   @else
   <p class="muted">Nem volt elmaradt vagy hiányos kör.</p>
   @endif
@@ -86,12 +95,17 @@
   @if(count($flags))
   <h2>Jelölések</h2>
   <p>@foreach($flags as $f)<b>{{ $f['count'] }}</b> {{ $f['label'] }}@if(! $loop->last) · @endif @endforeach</p>
-  <table>
-    <tr><th>Nap</th><th>Idő</th><th>Pont</th><th>Mód</th><th>Jelölés</th></tr>
-    @foreach($flagged_scans as $p)
-    <tr><td>{{ $p['day'] }}</td><td>{{ $p['time'] }}</td><td><b>{{ $p['name'] }}</b></td><td>{{ $p['method'] }}</td><td style="color:#B4470F;">{{ $p['flag_text'] }}</td></tr>
+  @foreach(array_chunk($flagged_scans, $chunk) as $rows)
+  <table class="fixed">
+    @if($loop->first)<tr><th style="width:15%;">Nap</th><th style="width:8%;">Idő</th><th style="width:31%;">Pont</th><th style="width:10%;">Mód</th><th>Jelölés</th></tr>@endif
+    @foreach($rows as $p)
+    <tr><td style="width:15%;">{{ $p['day'] }}</td><td style="width:8%;">{{ $p['time'] }}</td><td style="width:31%;"><b>{{ $p['name'] }}</b></td><td style="width:10%;">{{ $p['method'] }}</td><td style="color:#B4470F;">{{ $p['flag_text'] }}</td></tr>
     @endforeach
   </table>
+  @endforeach
+  @if($flagged_more)
+  <p class="muted">… és további {{ $flagged_more }} jelölt leolvasás (a fenti összesítésben benne vannak).</p>
+  @endif
   @endif
 
   <h2>Események kategóriánként</h2>
@@ -105,7 +119,7 @@
     @endif
     @if($i['note'])<div>„{{ $i['note'] }}”</div>@endif
     @if($i['photos_missing'])<div style="color:#C0262D;">{{ $i['photos_missing'] }} fotó nem érkezett meg.</div>@endif
-    @if(count($i['photos']))<div>@foreach($i['photos'] as $p)<img src="{{ $p['url'] }}" alt="Fotó">@endforeach</div>@endif
+    @if(count($i['photos']))<div>@foreach($i['photos'] as $p)<img src="{{ $p['url'] }}" alt="Fotó">@endforeach<div style="clear: both;"></div></div>@endif
   </div>
   @endforeach
   @else

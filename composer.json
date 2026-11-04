@@ -61,6 +61,7 @@
         "prepare": "@php vendor/bin/testbench package:discover --ansi",
         "build": "@php vendor/bin/testbench workbench:build --ansi",
         "seed": "@php vendor/bin/testbench db:seed --class=Workbench\\\\Database\\\\Seeders\\\\DatabaseSeeder --ansi",
+        "seed-reports": "@php vendor/bin/testbench db:seed --class=Workbench\\\\Database\\\\Seeders\\\\ReportDemoSeeder --ansi",
         "serve": [
             "Composer\\Config::disableProcessTimeout",
             "@build",

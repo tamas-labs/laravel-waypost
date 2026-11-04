@@ -16,6 +16,7 @@ use Waypost\Reports\Pdf;
 use Waypost\Reports\ReportContent;
 use Waypost\Reports\ReportSender;
 use Waypost\Reports\Summarizer;
+use Waypost\Reports\Summary;
 use Waypost\Reports\Thumbnails;
 
 /**
@@ -41,6 +42,18 @@ final class SendPeriodReport implements ShouldQueue
         $this->onQueue(config('waypost.queue.queue'));
     }
 
+    /** The PDF of a weekly or monthly report: the e-mail's content with the photos embedded. */
+    public static function pdf(Summary $summary, ReportFrequency $type): string
+    {
+        $title = Labels::report($type);
+        $content = ReportContent::period($summary, $type, Thumbnails::dataUri(...));
+
+        return Pdf::render(
+            view('waypost::pdf.period-report', $content)->render(),
+            "Waypost · {$summary->site->name} · {$title} · {$content['period_label']}",
+        );
+    }
+
     public function handle(Summarizer $summarizer, ReportSender $sender): void
     {
         $site = Site::query()->find($this->siteId);
@@ -64,10 +77,7 @@ final class SendPeriodReport implements ShouldQueue
             $summary->periodStart,
             $summary->periodEnd,
             fn (Report $report, ?string $pdf): ReportMail => new ReportMail($report, 'waypost::mail.period-report', $content, $subject, $pdf, $pdfName),
-            $withPdf ? fn (): string => Pdf::render(
-                view('waypost::pdf.period-report', ReportContent::period($summary, $this->type, Thumbnails::dataUri(...)))->render(),
-                "Waypost · {$site->name} · {$title} · {$content['period_label']}",
-            ) : null,
+            $withPdf ? fn (): string => self::pdf($summary, $this->type) : null,
         );
     }
 }

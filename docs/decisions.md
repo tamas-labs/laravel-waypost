@@ -438,3 +438,51 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - **Sablonok:** `waypost::` névtérben, `vendor:publish --tag=waypost-views`-szel átírhatók.
 - **Indok:** A specifikáció *Jelentések* táblázata szerint; a 15 perces lépés minden időzóna 10:00-ját eléri (a félórás eltolásúakét is), és a `reports` sor egyedi indexe miatt egy kétszer induló job sem küld kétszer.
 - **Érintett:** `src/Jobs/SendDueReports.php`, `SendPeriodReport.php`, `src/Reports/ReportPeriod.php`, `Pdf.php`, `Thumbnails.php`, `ReportContent.php`, `resources/views/mail/period-report.blade.php`, `resources/views/pdf/period-report.blade.php`, `src/WaypostServiceProvider.php`, `composer.json`, `scripts/install-smoke.sh`, `tests/Feature/Reports/PeriodReportTest.php`, `tests/Unit/Reports/`, M6-06 – M6-09.
+
+## 2026-11-04 – A „Nincs adat” figyelmeztetés (M6-10)
+
+- **Kérdés:** Mi az „utolsó várt kör”, mikor hallgat a telefon, mi egy menetrendi ablak, és kik kapják?
+- **Döntés:**
+  - **Futás:** 15 percenként (`SendNoDataAlerts`), azokra a telephelyekre, amelyeknek van nem visszavont telefonja.
+  - **Utolsó várt kör:** a tegnapi és a mai (helyi) nap menetrendjéből (`Summarizer::period()`) az a várt kör, amelynek a határideje a legkésőbbi azok közül, amelyek legalább `no_data_alert_after_min` perce lejártak. Ha ehhez van kör a szerveren, nincs figyelmeztetés.
+  - **Hallgat a telefon:** a telephely minden nem visszavont, a határidő előtt hozzárendelt telefonjának `last_seen_at`-je régebbi a határidőnél (vagy üres). A határidő után hozzárendelt telefontól még nem várunk adatot; telefon nélküli telephelyre nem megy figyelmeztetés (a jelentésekben a körei elmaradnak).
+  - **Egyszer egy ablakra:** az ablak a kör menetrendi kezdőnapja (`RoundRow::startDay`, ugyanaz, mint a jelentésekben: az éjfélen átnyúló éjszaka a kezdőnapjáé). Az új `no_data_alerts` tábla (egyedi: telephely + `window_day`) a küldés előtt foglal; ha a küldés hibát dob, a sor törlődik, és a job újrapróbálja. A sor a figyelmeztetés adatait is megőrzi (kör, határidő, utoljára látva, címzettek, `sent_at`).
+  - **Címzettek:** a telephely minden aktív, e-mail-címmel rendelkező supervisora; ez a telephely beállítása, nem előfizetés.
+  - **Szöveg:** „Nincs adat – {telephely}” tárgy; a levél megmondja, mióta nem jelentkezett a telefon, melyik kör volt az utolsó várt, a határidejét és az azóta eltelt időt, és mit érdemes megnézni.
+- **Indok:** A specifikáció *„Nincs adat” figyelmeztetés* pontja szerint. Az ablak kezdőnapja a jelentésekkel azonos fogalom, és a 15 perces futás egy ablakban többször is eléri a feltételt, ezért kell a tárolt sor.
+- **Érintett:** `src/Jobs/SendNoDataAlerts.php`, `src/Mail/NoDataAlertMail.php`, `src/Models/NoDataAlert.php`, `database/migrations/2026_11_04_000017_create_waypost_no_data_alerts_table.php`, `resources/views/mail/no-data-alert.blade.php`, `src/WaypostServiceProvider.php`, `tests/Feature/Reports/NoDataAlertTest.php`, M6-10.
+
+## 2026-11-04 – Az adatmegőrzés (M6-11)
+
+- **Kérdés:** Mit, milyen sorrendben és melyik időpont szerint töröl a napi job, hogy a vetület és a lánc ne maradjon félig?
+- **Döntés:**
+  - **Futás:** naponta 03:30-kor (az alkalmazás időzónájában), `PruneExpiredData`.
+  - **Határ:** telephelyenként `most − Retention::days()` (31 vagy 62 nap). A telephelyhez már nem tartozó telefon adatára a legrövidebb (31 nap).
+  - **Mit, mi szerint:**
+    - a műszak, ha az `ended_at`-je (lezáratlannál a `started_at`-je) a határ előtt van, mindenével együtt: körei, leolvasásai, eseményei és ezek fotói (fájllal);
+    - a körön kívüli leolvasás a `scanned_at` szerint;
+    - a fotók a `taken_at` szerint;
+    - a láncbejegyzések a `received_at` szerint, de csak akkor, ha már egyetlen megmaradt vetület sem hivatkozik rájuk;
+    - a `device_diagnostics` a `received_at` szerint;
+    - a `no_data_alerts` a határidő szerint;
+    - a tárolt PDF a `reports.period_end` szerint: a fájl törlődik, a sor marad `path = null`-lal, így az archívum mutatja, hogy a jelentés kiment, de már nem tölthető le.
+  - Egy eseményben hivatkozott leolvasás az eseménnyel együtt törlődik.
+  - A törlés 500-as darabokban megy.
+  - **Megmarad:** a konfiguráció (pontok és fotóik, útvonalverziók, menetrendek, felhasználók), és a `devices.last_seq` és `last_hash`. A lánc ezekről folytatódik, és a telefon által újraküldött, már törölt bejegyzést a `ChainProcessor` a HMAC-ja alapján ismeri fel.
+- **Indok:** A specifikáció *Adatmegőrzés* pontja szerint. A műszak az egység, mert a jelentések műszakonként olvassák az adatot. A láncbejegyzés csak az utolsó hivatkozó vetülettel mehet, különben egy megmaradt kör forrása nem lenne ellenőrizhető.
+- **Érintett:** `src/Jobs/PruneExpiredData.php`, `src/WaypostServiceProvider.php`, `tests/Feature/Reports/PruneExpiredDataTest.php`, M6-11.
+
+## 2026-11-04 – A jelentések átnézése és a PDF memóriaigénye (M6-12)
+
+- **Kérdés:** Hogyan nézhetők át a jelentések valószerű adattal, és elég-e a queue worker szokásos 128M memóriája a havi PDF-hez?
+- **Döntés:**
+  - **Demóadat:** `ReportDemoSeeder` (`composer seed-reports`, a `composer build` után). 40 éjszaka egy telephelyen, aláírt láncként a `ChainProcessor`-on át: elmaradt és hiányos körök, átadás, kézi leolvasás, időgyanús, túl gyors és pont mellett leolvasott pontok, események fotóval. A seeder csak kérésre fut, a `DatabaseSeeder` nem hívja.
+  - **Előnézet:** a workbench `/reports` útvonalai (`shift`, `daily`, `weekly`, `monthly`, `weekly.pdf`, `monthly.pdf`, `no-data`) a mostani adatból renderelnek, küldés és tárolás nélkül.
+  - **PDF-memória:** a dompdf a teljes elrendezést a memóriában tartja, egy hosszú táblázatot a soraival négyzetesen növekvő memóriával; 600 sornál ez 120 MB. Ezért:
+    - a hosszú listák 25 soros táblázatokban, rögzített oszlopszélességgel (`table-layout: fixed`) kerülnek a PDF-be, így a memória a sorokkal lineárisan nő (kb. 0,1 MB soronként);
+    - a heti és havi jelentés legfeljebb 100 jelölt leolvasást sorol fel (`ReportContent::FLAGGED_SCANS_LISTED`), a többit csak megszámolja („… és további N”). A specifikáció a heti és havi jelentésben nem kéri a leolvasásonkénti listát, a napiban viszont minden jelölt leolvasás benne marad;
+    - a `Pdf::render()` a renderelés idejére legalább 512M-ra emeli a `memory_limit`-et (`Pdf::MEMORY_LIMIT`; a nagyobbat vagy a korlátlant nem csökkenti), utána visszaállítja.
+  - **Fotók a PDF-ben:** lebegtetve (`float: left`), mert a dompdf a több beágyazott képből álló sort egy sorral feljebb rajzolja, a megjegyzés fölé.
+  - **Dátum az elmaradt és hiányos köröknél:** a kör esedékességének a napja, mint a jelöléseknél és az eseményeknél (az éjszaka 01:00-s köre a következő napé); a napi táblázat továbbra is a menetrendi ablak kezdőnapja szerint számol.
+- **Indok:** Egy rosszul betanított pont egy hónap minden leolvasását megjelöli, és ettől egy 128M-os workeren a havi jelentés nem készülne el. A 25 soros darabolás és a felső korlát együtt a legrosszabb esetet is 100 MB körül tartja.
+- **Érintett:** `src/Reports/Pdf.php`, `ReportContent.php`, `resources/views/pdf/period-report.blade.php`, `workbench/database/seeders/ReportDemoSeeder.php`, `workbench/routes/web.php`, `composer.json`, `tests/Feature/ReportDemoSeederTest.php`, `tests/Feature/Reports/PeriodReportTest.php`, M6-12.

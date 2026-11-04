@@ -26,8 +26,10 @@ use Waypost\Console\CreateSupervisorCommand;
 use Waypost\Console\InstallCommand;
 use Waypost\Http\ErrorRenderer;
 use Waypost\Http\Middleware\FormatApiResponse;
+use Waypost\Jobs\PruneExpiredData;
 use Waypost\Jobs\PruneIdempotencyKeys;
 use Waypost\Jobs\SendDueReports;
+use Waypost\Jobs\SendNoDataAlerts;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\ReportSubscription;
@@ -168,6 +170,8 @@ final class WaypostServiceProvider extends ServiceProvider
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
             $schedule->job(new PruneIdempotencyKeys())->hourly()->name('waypost:prune-idempotency-keys');
             $schedule->job(new SendDueReports())->everyFifteenMinutes()->name('waypost:send-due-reports');
+            $schedule->job(new SendNoDataAlerts())->everyFifteenMinutes()->name('waypost:send-no-data-alerts');
+            $schedule->job(new PruneExpiredData())->dailyAt('03:30')->name('waypost:prune-expired-data');
         });
     }
 }

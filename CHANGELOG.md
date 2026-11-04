@@ -16,6 +16,9 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 - Napi, heti és havi jelentés: 15 percenként ütemezett job (`SendDueReports`) küldi telephelyenként a helyi 10:00-kor; HTML e-mail, a heti és a havi PDF-fel (dompdf, DejaVu Sans, beágyazott bélyegképek), amely a `waypost/reports` alá is tárolódik a jelentésarchívumnak.
 - Címzettek a `report_subscriptions` szerint (a telephely aktív supervisorai), egy jelentés a `reports` táblába kerül, és nem megy ki kétszer.
 - A sablonok publikálhatók: `vendor:publish --tag=waypost-views`.
+- „Nincs adat” figyelmeztetés: 15 percenként ütemezett job (`SendNoDataAlerts`) e-mailt küld a telephely supervisorainak, ha az utolsó várt kör határideje óta `no_data_alert_after_min` perc eltelt, és a telephely telefonja azóta nem jelentkezett; menetrendi ablakonként egyszer (új tábla: `no_data_alerts`).
+- Adatmegőrzés: naponta 03:30-kor futó job (`PruneExpiredData`) törli a megőrzési időnél (31 vagy 62 nap) régebbi láncbejegyzéseket, műszakokat, köröket, leolvasásokat, eseményeket, fotókat, diagnosztikai jelzéseket és tárolt PDF-eket; a `devices.last_seq` és `last_hash` megmarad.
+- A workbenchben: jelentés-demóadat (`composer seed-reports`, 40 éjszaka) és a jelentések előnézete a `/reports` alatt.
 
 ### Changed
 

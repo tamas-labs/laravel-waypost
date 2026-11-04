@@ -42,6 +42,9 @@ final class ReportContent
         'out_of_round' => 'warning',
     ];
 
+    /** The flagged scans a weekly or monthly report lists. */
+    public const int FLAGGED_SCANS_LISTED = 100;
+
     private LocalFormat $format;
 
     /** @var Collection<string, Checkpoint> */
@@ -116,6 +119,11 @@ final class ReportContent
     {
         $content = new self($summary, $embed);
         $format = $content->format;
+        // The daily report lists every flagged scan; the weekly and monthly ones count them by flag, and their PDF
+        // lists the first ones only (a misplaced checkpoint flags every scan of a month).
+        $flagged = $type === ReportFrequency::Daily
+            ? $summary->flaggedScans
+            : array_slice($summary->flaggedScans, 0, self::FLAGGED_SCANS_LISTED);
         $problems = array_values(array_filter($summary->rounds, fn (RoundRow $row): bool => in_array(
             $row->outcome,
             [RoundOutcome::Missed, RoundOutcome::Incomplete, RoundOutcome::Pending],
@@ -137,7 +145,8 @@ final class ReportContent
             'days' => $summary->fromDate === $summary->toDate ? [] : $content->days(),
             'show_route' => $content->showsRoutes(),
             'problem_rounds' => array_map(fn (RoundRow $row): array => [
-                'day' => LocalFormat::shortDate($row->startDay),
+                // The date the round was due, like the scans' and the incidents': a night's 01:00 is the next day's.
+                'day' => LocalFormat::shortDate($format->local($row->scheduledAt)->format('Y-m-d')),
                 ...$content->round($row),
                 'missing' => implode(', ', array_map($content->checkpointName(...), $row->missingCheckpointIds)),
             ], $problems),
@@ -152,7 +161,8 @@ final class ReportContent
             'flagged_scans' => array_map(fn (Scan $scan): array => [
                 'day' => LocalFormat::shortDate($format->local($scan->scanned_at)->format('Y-m-d')),
                 ...$content->outsideScan($scan),
-            ], $summary->flaggedScans),
+            ], $flagged),
+            'flagged_more' => count($summary->flaggedScans) - count($flagged),
             'incident_categories' => $content->incidentCategories(),
             'incidents' => array_map(fn (Incident $incident): array => [
                 'day' => LocalFormat::shortDate($format->local($incident->occurred_at)->format('Y-m-d')),
