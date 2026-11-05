@@ -43,6 +43,15 @@ return [
     ],
 
     /*
+    | Milliseconds a changed record waits before GET /sync/pull sends it (Pull::SETTLE_MS by default): the
+    | transaction that wrote it may not have committed yet. It must exceed the longest transaction and the
+    | clock difference of the application servers, or a change may be missed for good.
+    */
+    'pull' => [
+        'settle_ms' => (int) env('WAYPOST_PULL_SETTLE_MS', 5000),
+    ],
+
+    /*
     | Signed URLs of the private files (they need no token): a photo's link in a report lives until the data
     | retention deletes the photo; the link of a stored report file in the report archive (GET /reports) lives
     | this many minutes.

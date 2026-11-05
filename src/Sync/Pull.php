@@ -41,7 +41,8 @@ final class Pull
 
     /**
      * Records changed in the last milliseconds wait for the next pull: a transaction that wrote them may not have
-     * committed yet, and once the cursor passed their change time they would never come.
+     * committed yet, and once the cursor passed their change time they would never come. The default of
+     * waypost.pull.settle_ms; a longer transaction, or application servers whose clocks differ more, need more.
      */
     public const int SETTLE_MS = 5000;
 
@@ -78,7 +79,7 @@ final class Pull
         if ($reset) {
             $from = PullCursor::start($scope);
         }
-        $until = Time::now()->subMilliseconds(self::SETTLE_MS);
+        $until = Time::now()->subMilliseconds((int) config('waypost.pull.settle_ms', self::SETTLE_MS));
 
         // First only the keys and the sizes of the candidates (each table's next PAGE_SIZE + 1), then the whole records
         // of those that make the page: the others are not loaded, nor their checkpoints and sites.

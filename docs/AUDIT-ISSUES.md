@@ -417,6 +417,7 @@ Nincs ilyen megállapítás.
   - opcionálisan a `SETTLE_MS` konfigurálhatóvá tétele;
   - vagy egy monoton, adatbázis által kiosztott változásszámláló a kurzorhoz.
 - **Bizonyosság:** közepes.
+- **Állapot:** javítva (2026-11-05): az ülepedési idő a `waypost.pull.settle_ms` (`WAYPOST_PULL_SETTLE_MS`, alapból 5000) beállítással növelhető. A README *Üzemeltetés* fejezete kéri a pontos szerverórát (NTP), és hogy az órák eltérése és a leghosszabb tranzakció maradjon e határ alatt. A monoton, adatbázis által kiosztott változásszámláló kurzorváltozást és minden szinkronizált táblán új oszlopot kívánna, ezért nem készült el. Teszt: `SyncPullTest`; döntés: `docs/decisions.md` (A pull / Ülepedés).
 
 ### WP-BE-023 – Az `ext-fileinfo` nincs a függőségek között, pedig a feltöltés MIME-ellenőrzése rá épül
 

@@ -157,6 +157,20 @@ it('sends what changed in the last seconds only once it settled', function (): v
     expect(changed(pullAs($supervisor, $now->json('cursor')), 'checkpoints'))->toBe([$checkpoint->id]);
 });
 
+it('waits as long as waypost.pull.settle_ms tells', function (): void {
+    config(['waypost.pull.settle_ms' => 60_000]);
+    $site = Site::factory()->create();
+    $supervisor = supervisorOf($site);
+    travelTo(Time::now()->addMinute()->addMillisecond());
+    $cursor = pullAs($supervisor)->json('cursor');
+    $checkpoint = Checkpoint::factory()->for($site)->create();
+
+    travelTo(Time::now()->addSeconds(59));
+    expect(changed(pullAs($supervisor, $cursor), 'checkpoints'))->toBe([]);
+    travelTo(Time::now()->addSecond()->addMillisecond());
+    expect(changed(pullAs($supervisor, $cursor), 'checkpoints'))->toBe([$checkpoint->id]);
+});
+
 it('brings changes and deletions since the cursor', function (): void {
     [$site, $other] = [Site::factory()->create(), Site::factory()->create()];
     $supervisor = supervisorOf($site);
