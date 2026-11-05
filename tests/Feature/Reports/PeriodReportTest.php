@@ -8,6 +8,7 @@ use Illuminate\Console\Scheduling\Schedule as Scheduler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Waypost\Enums\IncidentCategory;
 use Waypost\Enums\ReportFrequency;
@@ -269,6 +270,17 @@ it('tells at the top when the data is not complete yet', function (): void {
     expect($mail->subjectLine)->toEndWith('(nem teljes adat)')
         ->and($mail->content['incomplete'])->toBe(['a telefon az időszak vége óta nem szinkronizált'])
         ->and($mail->render())->toContain('Nem teljes adat:');
+});
+
+it('queues a report only once while it waits or runs', function (): void {
+    Queue::fake();
+
+    dispatch(new SendPeriodReport('x', ReportFrequency::Weekly, '2026-10-26', '2026-11-01'));
+    dispatch(new SendPeriodReport('x', ReportFrequency::Weekly, '2026-10-26', '2026-11-01'));
+    dispatch(new SendPeriodReport('x', ReportFrequency::Weekly, '2026-11-02', '2026-11-08'));
+    dispatch(new SendPeriodReport('x', ReportFrequency::Daily, '2026-11-01', '2026-11-01'));
+
+    Queue::assertPushed(SendPeriodReport::class, 3);
 });
 
 it('schedules the due reports every 15 minutes on the configured queue', function (): void {

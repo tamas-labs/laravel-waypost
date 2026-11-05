@@ -6,6 +6,7 @@ namespace Waypost\Jobs;
 
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -34,9 +35,12 @@ use Waypost\Support\Time;
  * Only a site with a phone: one enrolled before the deadline, not revoked, not deleted. A site without a phone sends
  * nothing to wait for; its rounds are missed in the reports.
  */
-final class SendNoDataAlerts implements ShouldQueue
+final class SendNoDataAlerts implements ShouldQueue, ShouldBeUnique
 {
     use Queueable;
+
+    /** Seconds the unique lock lasts at most: a run that died does not block the next ones for longer. */
+    public int $uniqueFor = 900;
 
     public int $tries = 3;
 

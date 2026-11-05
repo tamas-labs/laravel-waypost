@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waypost\Jobs;
 
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -23,9 +24,12 @@ use Waypost\Reports\Thumbnails;
  * A daily, weekly or monthly report of a site (spec: Jelentések), from the data as it is now: HTML e-mail, and for the
  * weekly and monthly one a PDF with the photos embedded, attached and stored. SendDueReports dispatches it.
  */
-final class SendPeriodReport implements ShouldQueue
+final class SendPeriodReport implements ShouldQueue, ShouldBeUnique
 {
     use Queueable;
+
+    /** Seconds the unique lock lasts at most, the retries included. */
+    public int $uniqueFor = 3600;
 
     public int $tries = 3;
 
@@ -40,6 +44,12 @@ final class SendPeriodReport implements ShouldQueue
     ) {
         $this->onConnection(config('waypost.queue.connection'));
         $this->onQueue(config('waypost.queue.queue'));
+    }
+
+    /** One job per report: SendDueReports dispatches it every 15 minutes while it is due. */
+    public function uniqueId(): string
+    {
+        return "{$this->siteId}|{$this->type->value}|{$this->fromDate}|{$this->toDate}";
     }
 
     /** The PDF of a weekly or monthly report: the e-mail's content with the photos embedded. */

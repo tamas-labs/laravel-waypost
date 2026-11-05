@@ -67,6 +67,7 @@ Az útvonalak a `waypost.route.middleware` middleware-jeivel futnak, ez alapból
 
 ## Üzemeltetés
 
+- **Több alkalmazásszerver:** az ütemezett jobok csak egy szerveren indulnak (`onOneServer`), és egy még futó jobot a következő indítás nem kettőz meg (`ShouldBeUnique`). Mindkettő a gazda alapértelmezett cache-ében zárol, ezért ott közös, zárolást támogató cache kell (`redis`, `database`, `memcached`). A `file` és az `array` cache csak egy szerveren megfelelő.
 - **Proxy mögött** (terheléselosztó, CDN) a gazda `TrustProxies` middleware-jében meg kell bízni a proxyban, különben a belépési korlát IP-címe a proxyé: egyetlen felhasználó hibás próbálkozásai is mindenki belépését megfoghatják.
 - **A telephelyi telefon tokenje a telephely kulcsa.** A PIN-t a telefon ellenőrzi, offline. Az `X-Acting-User` fejlécben kapott supervisorról a szerver csak azt nézi meg, hogy aktív-e, és hozzá van-e rendelve a telephelyhez. Aki a telefon tokenjét megszerzi, a telephelyen bármelyik supervisor nevében eljárhat: felhasználót (jelszavas supervisort is), pontot, útvonalat és menetrendet hozhat létre, módosíthat vagy törölhet, de csak ezen a telephelyen. Az elveszett vagy ellopott telefont ezért azonnal le kell váltani: egy új telefon hozzárendelése (`POST /devices/enroll`) a telephely régi telefonját visszavonja.
 

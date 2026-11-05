@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waypost\Jobs;
 
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Waypost\Enums\ReportFrequency;
@@ -19,9 +20,12 @@ use Waypost\Support\Time;
  * not sent yet, for the sites with a subscription to them. Scheduled every 15 minutes by the service provider, so
  * every time zone's 10:00 is met, and a missed run is made up by the next one.
  */
-final class SendDueReports implements ShouldQueue
+final class SendDueReports implements ShouldQueue, ShouldBeUnique
 {
     use Queueable;
+
+    /** Seconds the unique lock lasts at most: a run that died does not block the next ones for longer. */
+    public int $uniqueFor = 900;
 
     public const array TYPES = [ReportFrequency::Daily, ReportFrequency::Weekly, ReportFrequency::Monthly];
 

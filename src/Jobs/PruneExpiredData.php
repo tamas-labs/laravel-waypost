@@ -7,6 +7,7 @@ namespace Waypost\Jobs;
 use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -39,9 +40,12 @@ use Waypost\Support\Time;
  * phone sends it again (ChainProcessor). A shift is deleted with everything in it once it ended before the cutoff;
  * a chain entry only when no remaining projection refers to it.
  */
-final class PruneExpiredData implements ShouldQueue
+final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
 {
     use Queueable;
+
+    /** Seconds the unique lock lasts at most: a run that died does not block the next ones for longer. */
+    public int $uniqueFor = 21600;
 
     /** Rows deleted in one statement. */
     public const int CHUNK = 500;

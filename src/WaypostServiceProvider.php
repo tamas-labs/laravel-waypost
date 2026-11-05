@@ -174,11 +174,13 @@ final class WaypostServiceProvider extends ServiceProvider
             self::VIEWS_DIRECTORY => resource_path('views/vendor/waypost'),
         ], 'waypost-views');
 
+        // On one server of several (a lock in the host's cache), and each job is unique while it waits or runs
+        // (ShouldBeUnique): a slow run is not doubled by the next one.
         $this->callAfterResolving(Schedule::class, function (Schedule $schedule): void {
-            $schedule->job(new PruneIdempotencyKeys())->hourly()->name('waypost:prune-idempotency-keys');
-            $schedule->job(new SendDueReports())->everyFifteenMinutes()->name('waypost:send-due-reports');
-            $schedule->job(new SendNoDataAlerts())->everyFifteenMinutes()->name('waypost:send-no-data-alerts');
-            $schedule->job(new PruneExpiredData())->dailyAt('03:30')->name('waypost:prune-expired-data');
+            $schedule->job(new PruneIdempotencyKeys())->hourly()->name('waypost:prune-idempotency-keys')->onOneServer();
+            $schedule->job(new SendDueReports())->everyFifteenMinutes()->name('waypost:send-due-reports')->onOneServer();
+            $schedule->job(new SendNoDataAlerts())->everyFifteenMinutes()->name('waypost:send-no-data-alerts')->onOneServer();
+            $schedule->job(new PruneExpiredData())->dailyAt('03:30')->name('waypost:prune-expired-data')->onOneServer();
         });
     }
 }

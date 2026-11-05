@@ -375,6 +375,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Teljesítmény*.
 - **Javítási irány:** `->onOneServer()->withoutOverlapping()` az ütemezésben, `ShouldBeUnique` a `SendPeriodReport`-on a (telephely, típus, időszak) kulccsal. A README-ben jelezni, hogy a cache drivernek zárolást kell támogatnia.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a négy ütemezett job `onOneServer()`. Mind a négy `ShouldBeUnique` (`uniqueFor` 900, 3600, illetve 21 600 másodperc), és a `SendPeriodReport` is, a (telephely, típus, időszak) kulccsal. A közös, zárolást támogató cache igénye a README *Üzemeltetés* fejezetében. Teszt: `ServiceProviderTest`, `PeriodReportTest`; döntés: `docs/decisions.md` (A napi, heti és havi jelentés / Több szerver, átfedés).
 
 ### WP-BE-020 – Ha a több címzett egyikénél bukik a küldés, az újrapróbálás a már kiküldött címzetteknek is újra elküldi
 

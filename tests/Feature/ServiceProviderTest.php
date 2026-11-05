@@ -2,7 +2,16 @@
 
 declare(strict_types=1);
 
+use Illuminate\Console\Scheduling\CallbackEvent;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\ServiceProvider;
+use Waypost\Enums\ReportFrequency;
+use Waypost\Jobs\PruneExpiredData;
+use Waypost\Jobs\PruneIdempotencyKeys;
+use Waypost\Jobs\SendDueReports;
+use Waypost\Jobs\SendNoDataAlerts;
+use Waypost\Jobs\SendPeriodReport;
 use Waypost\WaypostServiceProvider;
 
 it('is registered', function (): void {
@@ -22,4 +31,15 @@ it('publishes the configuration under the waypost-config tag', function (): void
     $paths = ServiceProvider::pathsToPublish(WaypostServiceProvider::class, 'waypost-config');
 
     expect(array_values($paths))->toBe([config_path('waypost.php')]);
+});
+
+it('runs its scheduled jobs on one server, and none of them twice at a time', function (): void {
+    $events = array_filter(app(Schedule::class)->events(), fn ($event): bool => $event instanceof CallbackEvent && str_starts_with((string) $event->description, 'waypost:'));
+
+    expect($events)->toHaveCount(4)
+        ->and(array_values(array_map(fn (CallbackEvent $event): bool => $event->onOneServer, $events)))->toBe([true, true, true, true]);
+    $jobs = [new PruneIdempotencyKeys(), new SendDueReports(), new SendNoDataAlerts(), new PruneExpiredData(), new SendPeriodReport('x', ReportFrequency::Daily, '2026-11-03', '2026-11-03')];
+    foreach ($jobs as $job) {
+        expect($job)->toBeInstanceOf(ShouldBeUnique::class)->and($job->uniqueFor)->toBeGreaterThan(0);
+    }
 });
