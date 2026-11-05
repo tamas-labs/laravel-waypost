@@ -286,6 +286,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *API és szerződések* (a séma mint teljes szerződés).
 - **Javítási irány:** `maximum` a sémában (előbb a `waypost-schema`-ban, új verzióval), és a többi `smallint` / `integer` oszlop sémamaximumának átnézése PostgreSQL-tartományra.
 - **Bizonyosság:** magas.
+- **Állapot:** a sémában javítva, itt a sémafrissítéssel zárul: a `waypost-schema` v0.7.0 mindkét gyalogidőre `maximum: 86400`-at tesz (`route-version-create.request`, az entitássémák). Ez az oszlopba fér, a 0.6.0 szerint túl nagy érték pedig a sémaellenőrzésen akad fenn (422). A csomag még a v0.6.0-n áll; a frissítés külön feladat. Ideiglenes backendkorlát nem került be, hogy ne legyen kétféle hibaüzenet. A többi egész oszlop sémamaximuma (v0.6.0) belefér a PostgreSQL-tartományba (`accuracy_dm` ≤ 2³¹−1, a perces mezők ≤ 1440, `position` ≤ 500).
 
 ### WP-BE-014 – A kliens által megadott `taken_at` szabja meg a fotólink élettartamát és az egyik törlési feltételt
 
