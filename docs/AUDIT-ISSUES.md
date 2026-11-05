@@ -223,6 +223,7 @@ Nincs ilyen megállapítás.
   - Rövid távon: a WP-BE-001 javítása, és a README-ben vagy a telepítési leírásban rögzíteni, hogy az eszköztoken kompromittálása a telephely kompromittálása.
   - Hosszabb távon (2. lépcső): az `X-Acting-User` mellé egy, a supervisor PIN-jéből vagy az eszköz titkából származó, rövid életű igazolás.
 - **Bizonyosság:** magas.
+- **Állapot:** dokumentálva (2026-11-05): a README új *Üzemeltetés* fejezete kimondja, hogy az eszköztoken a telephely kulcsa, és hogy az elveszett telefont új hozzárendeléssel azonnal le kell váltani. A WP-BE-001 javítása megvan. A szerveroldali igazolás a 2. lépcső kérdése. Döntés: `docs/decisions.md` (Azonosítás … / Az eszköztoken kockázata).
 
 ### WP-BE-010 – A PIN egyedisége versenyhelyzetben nem garantált
 

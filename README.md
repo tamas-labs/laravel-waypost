@@ -63,6 +63,10 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 
 Az útvonalak a `waypost.route.middleware` middleware-jeivel futnak, ez alapból az `api` csoport.
 
+## Üzemeltetés
+
+- **A telephelyi telefon tokenje a telephely kulcsa.** A PIN-t a telefon ellenőrzi, offline. Az `X-Acting-User` fejlécben kapott supervisorról a szerver csak azt nézi meg, hogy aktív-e, és hozzá van-e rendelve a telephelyhez. Aki a telefon tokenjét megszerzi, a telephelyen bármelyik supervisor nevében eljárhat: felhasználót (jelszavas supervisort is), pontot, útvonalat és menetrendet hozhat létre, módosíthat vagy törölhet, de csak ezen a telephelyen. Az elveszett vagy ellopott telefont ezért azonnal le kell váltani: egy új telefon hozzárendelése (`POST /devices/enroll`) a telephely régi telefonját visszavonja.
+
 ## Az API röviden
 
 A kérések és válaszok pontos alakját a `waypost-schema` JSON Schemái rögzítik, a viselkedést a [fejlesztői specifikáció](../waypost/docs/Waypost%20–%20fejlesztői%20specifikáció%20(1.%20lépcső).md) *API-szerződés* szakasza. A legfontosabb szabályok:
