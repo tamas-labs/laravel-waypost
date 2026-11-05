@@ -447,7 +447,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Laravel package skeleton megfelelés*.
 - **Javítási irány:** `.gitattributes` `export-ignore` sorokkal, `.editorconfig`, LICENSE (vagy hivatkozás a feltételekre), teljesebb `composer.json`.
 - **Bizonyosság:** magas.
-- **Állapot:** részben javítva (2026-11-05): `.gitattributes` (`export-ignore`: tesztek, workbench, Docker, docs, scripts, a fejlesztői konfiguráció; a dist-archívumban csak a `src`, `config`, `database`, `resources`, `routes`, a README, a CHANGELOG és a `composer.json` marad, `git archive`-val ellenőrizve), `.editorconfig`, a `composer.json`-ban `keywords`, `homepage`, `authors`, `support`. **Döntésre vár:** a LICENSE fájl, illetve a „proprietary” licenc felhasználási feltételei. Ezek szövegét a tulajdonos adja meg.
+- **Állapot:** javítva (2026-11-05): `.gitattributes` (`export-ignore`: tesztek, workbench, Docker, docs, scripts, a fejlesztői konfiguráció; a dist-archívumban csak a `src`, `config`, `database`, `resources`, `routes`, a README, a CHANGELOG, a LICENSE és a `composer.json` marad, `git archive`-val ellenőrizve), `.editorconfig`, a `composer.json`-ban `keywords`, `homepage`, `authors`, `support`. A tulajdonos MIT licencet választott: `LICENSE`, a `composer.json`-ban `"license": "MIT"`.
 
 ### WP-BE-025 – A `Summarizer::summarize()` túl sok felelősséget visz egy metódusban
 

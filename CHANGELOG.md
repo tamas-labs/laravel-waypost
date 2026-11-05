@@ -36,6 +36,7 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 - A jelentés egy lekérdezéssel olvassa a megőrzési időt; a `Summarizer` a várt köröket az `ExpectedRounds`-ból, a körsorokat a `RoundRows`-ból kapja (WP-BE-025, WP-BE-026).
 - A PIN-hozzárendelés zárolja az érintett telephelyeket a mentés commitjáig, így két egyidejű kérés nem adhatja ugyanazt a PIN-t (WP-BE-010).
 - Index minden idegen kulcson PostgreSQL-en és SQLite-on is (új migráció; MySQL-en nem változik semmi) (WP-BE-006).
+- MIT licenc (`LICENSE`, a `composer.json`-ban eddig „proprietary”) (WP-BE-024).
 - Új követelmény: `ext-fileinfo`; `.gitattributes` (a kiadott archívumból kimaradnak a tesztek és a fejlesztői fájlok), `.editorconfig`, a `composer.json` metaadatai (WP-BE-023, WP-BE-024).
 - A `waypost/schema` függőség `^0.6`; a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal.
 
