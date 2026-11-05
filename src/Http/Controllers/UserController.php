@@ -61,10 +61,12 @@ final class UserController extends Controller
         self::checkEmail($input['email'] ?? null);
 
         $user = new User([...Arr::except($input, ['site_ids', 'pin']), 'id' => self::newId($request, User::class)]);
-        $pin = self::assignPin($user, self::pinOf($input), $siteIds);
-        self::write(function () use ($user, $siteIds): void {
+        $pin = self::write(function () use ($user, $input, $siteIds): ?string {
+            $pin = self::assignPin($user, self::pinOf($input), $siteIds);
             $user->save();
             $user->sites()->attach($siteIds);
+
+            return $pin;
         }, self::EMAIL_TAKEN);
 
         return self::created(self::userResponse($user, $caller, $pin));
@@ -123,9 +125,14 @@ final class UserController extends Controller
         $this->gate->authorize('update', $user);
         /** @var list<string> $siteIds */
         $siteIds = $user->sites()->pluck('id')->all();
+        $input = self::input($request);
 
-        $pin = self::assignPin($user, self::pinOf(self::input($request)), $siteIds);
-        $user->save();
+        $pin = DB::transaction(function () use ($user, $input, $siteIds): ?string {
+            $pin = self::assignPin($user, self::pinOf($input), $siteIds);
+            $user->save();
+
+            return $pin;
+        });
 
         return self::userResponse($user, $caller, $pin);
     }

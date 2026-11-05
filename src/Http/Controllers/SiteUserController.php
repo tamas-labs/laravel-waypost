@@ -53,11 +53,13 @@ final class SiteUserController extends Controller
 
         /** @var list<string> $siteIds */
         $siteIds = [...$user->sites()->pluck('id')->all(), $site->id];
-        $pin = self::assignPin($user, isset($input['pin']) && is_string($input['pin']) ? $input['pin'] : null, $siteIds);
-        self::write(function () use ($user, $site): void {
+        $pin = self::write(function () use ($user, $site, $input, $siteIds): ?string {
+            $pin = self::assignPin($user, isset($input['pin']) && is_string($input['pin']) ? $input['pin'] : null, $siteIds);
             $user->sites()->attach($site->id);
             // Also when the PIN did not change: sync pull brings the new site_ids by updated_at.
             $user->touch();
+
+            return $pin;
         });
 
         return self::userResponse($user, $caller, $pin);

@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Waypost\Enums\Role;
 use Waypost\Http\Middleware\HandleIdempotencyKey;
@@ -325,6 +327,31 @@ it('changes the PIN to the given one, unless another user of the user\'s sites h
     expect($response->json())->not->toHaveKey('pin');
     expect(hasPin($guard, '333333'))->toBeTrue();
 });
+
+it('locks the user\'s sites while it gives a PIN, until the user is saved', function (Closure $request): void {
+    [$a, $b] = [Site::factory()->create(), Site::factory()->create()];
+    $guard = User::factory()->withPin('111111')->create();
+    $guard->sites()->attach($a->id);
+    $outside = DB::transactionLevel();
+    $queries = [];
+    DB::listen(function (QueryExecuted $query) use (&$queries): void {
+        $queries[] = ['sql' => $query->sql, 'level' => $query->connection->transactionLevel()];
+    });
+
+    $request($guard, supervisorOf($a, $b), $a, $b)->assertSuccessful();
+
+    $sites = preg_quote(Site::query()->getModel()->getTable(), '/');
+    $users = preg_quote($guard->getTable(), '/');
+    $lock = array_key_first(array_filter($queries, fn (array $query): bool => preg_match("/from [`\"]{$sites}[`\"].* for (no key )?update$/i", $query['sql']) === 1));
+    $write = array_key_last(array_filter($queries, fn (array $query): bool => preg_match("/^(insert into|update) [`\"]{$users}[`\"]/i", $query['sql']) === 1));
+    expect($lock)->toBeInt()->and($write)->toBeInt()->and((int) $lock)->toBeLessThan((int) $write);
+    $between = array_slice($queries, (int) $lock, (int) $write - (int) $lock + 1);
+    expect(array_filter($between, fn (array $query): bool => $query['level'] <= $outside))->toBe([]);
+})->with([
+    'a new user' => [fn (User $guard, User $supervisor, Site $a, Site $b) => callApi('POST', 'users', $supervisor, ['name' => 'Kiss Péter', 'role' => 'guard', 'site_ids' => [$a->id, $b->id]])],
+    'a new PIN' => [fn (User $guard, User $supervisor) => callApi('PUT', "users/{$guard->id}/pin", $supervisor)],
+    'a new site' => [fn (User $guard, User $supervisor, Site $a, Site $b) => callApi('POST', "sites/{$b->id}/users", $supervisor, ['user_id' => $guard->id])],
+]);
 
 it('deletes a user with their subscriptions and tokens', function (): void {
     $site = Site::factory()->create();

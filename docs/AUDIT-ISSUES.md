@@ -239,6 +239,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Specifikáció, *PIN-kód* („Ugyanaz a PIN nem lehet két felhasználónál egy telephelyen belül … A szerver ezt a létrehozáskor ellenőrzi.”).
 - **Javítási irány:** Telephelyenkénti zár a PIN-hozzárendelés idejére: `lockForUpdate` az érintett `sites` sorokon, rendezett sorrendben, ugyanabban a tranzakcióban, mint a mentés.
 - **Bizonyosság:** magas a versenyablakra, alacsony a gyakoriságra.
+- **Állapot:** javítva (2026-11-05): az `AssignsPins::assignPin()` az érintett telephelyek sorát az ellenőrzéstől a mentés commitjáig zárolja, ID szerinti sorrendben; PostgreSQL-en `FOR NO KEY UPDATE`-tel, hogy a telephelyre hivatkozó sorok beszúrását ne tartsa fel. A három végpont (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) az ellenőrzést és a mentést egy tranzakcióban végzi. Teszt: `UsersTest` (a zár a mentésig tart); döntés: `docs/decisions.md` (PIN-szolgáltatás / Egyidejű kérések).
 
 ### WP-BE-011 – A PIN-ütközés ellenőrzése kérésenként felhasználónként egy 100 000 iterációs PBKDF2-t futtat (CPU-erősítés)
 
