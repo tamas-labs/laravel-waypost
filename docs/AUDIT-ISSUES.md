@@ -681,6 +681,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül (specifikáció, *A 2. lépcső előkészítése*).
 - **Javítási irány:** A `decisions.md`-ben rögzíteni a bevezetési sorrendet; egy `default => true` (tárolás vetület nélkül) ág megfontolható.
 - **Bizonyosság:** magas.
+- **Állapot:** dokumentálva (2026-11-05): a bevezetési sorrend (séma → backend → app, az `X-Waypost-Schema` szerint) a `docs/decisions.md`-ben (A push feldolgozása / Új bejegyzéstípus). A `default => true` ág szándékosan nincs: a kimerítő `match` hiányzó ágát a PHPStan jelzi (kipróbálva: `match.unhandled`), az `EnumsTest` az enumot a sémával veti össze; a `Projector` kommentje ezt rögzíti.
 
 ### WP-BE-042 – Az M7 (próbaidőszak, telepítési leírás) nem készült el; a README MySQL 8.4-et ír, a specifikáció MySQL 8-at
 

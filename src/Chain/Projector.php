@@ -46,6 +46,8 @@ final class Projector
     {
         $this->recordMedia($device, $entry);
 
+        // Exhaustive on purpose, without a default: a new entry type without its projection fails PHPStan
+        // (match.unhandled) instead of being stored silently unprojected.
         return match ($entry->type) {
             ChainEntryType::ShiftStarted => $this->shiftStarted($device, $entry),
             ChainEntryType::ShiftClosed => $this->shiftClosed($device, $entry),
