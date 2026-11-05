@@ -10,7 +10,7 @@ A csomag a gazda-alkalmazás tábláihoz nem nyúl: minden táblája `waypost_` 
 
 - PHP 8.4, `gd` (a PDF-jelentések bélyegképeihez) és `fileinfo` bővítménnyel (a feltöltött fotó típusának ellenőrzéséhez)
 - Laravel 13
-- MySQL 8.4 vagy PostgreSQL 16; a telepítési próba SQLite-on is lefut
+- MySQL 8.4 (LTS) vagy PostgreSQL 16; a CI mindkettőn tesztel. A MySQL 8.0 támogatása 2026 áprilisában véget ért, azon a csomagot nem teszteljük. A telepítési próba SQLite-on is lefut.
 - a `waypost/schema` csomag (a közös JSON Schema szerződés, a `waypost-schema` repo)
 
 ## Telepítés

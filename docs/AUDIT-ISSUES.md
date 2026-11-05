@@ -698,6 +698,7 @@ Nincs ilyen megállapítás.
   - az M7-01 elvégzése;
   - a támogatott MySQL-verzió egyeztetése (8.0 próba vagy a specifikáció pontosítása).
 - **Bizonyosság:** magas.
+- **Állapot:** részben (2026-11-05): a telepítési próba (`scripts/install-smoke.sh`) a CI-ben fut minden pushra (WP-BE-007). A támogatott MySQL a tulajdonos döntése szerint a 8.4 (LTS): a README ezt írja, a specifikáció pontosítása a `docs/AUDIT-OTHER-REPOS.md`-ben. **Nyitott:** az M7-01 próbaidőszak (valós eszközzel, 7 éjszaka adatvesztés nélkül) nem ennek a repónak a kódjában dől el.
 
 ---
 
