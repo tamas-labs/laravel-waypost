@@ -630,6 +630,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül.
 - **Javítási irány:** A CHANGELOG-ban jelezni („0.1.x → 0.2.0: friss telepítés szükséges”). A 0.2.0 után minden sémaváltozás új migrációban jöjjön; ez a `CLAUDE.md`-ben is szabály lehet.
 - **Bizonyosság:** magas.
+- **Állapot:** nem hiba, pontosítva (2026-11-05): az `upload_closed_at` és a `projected_at` a v0.1.0 előtt került a migrációkba (a `14bd3b5` commit a v0.1.0 része), a v0.1.0 és a v0.2.0 között csak új migráció jött (000017), így a 0.1.x-ről frissítőnek nincs teendője, és CHANGELOG-megjegyzés sem kell. A szabályt a `MigrationsTest` („never changes a released migration”) a kiadott migrációk SHA-256-jával kényszeríti ki; a CLAUDE.md-ben is ott áll. Döntés: `docs/decisions.md` (A fotó feltöltése és a push-final / Visszavont eszköz).
 
 ### WP-BE-038 – A tokenek `last_used_at` mezője soha nem frissül
 
