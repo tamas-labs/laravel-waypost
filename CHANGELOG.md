@@ -6,7 +6,7 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
-A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-029). Két új migráció (`foreign key` indexek, `reports.delivered_to`) és új követelmény (`ext-fileinfo`): frissítés után `php artisan waypost:install --migrate`.
+A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-029) és a `waypost/schema` 0.8.0. Két új migráció (`foreign key` indexek, `reports.delivered_to`) és új követelmény (`ext-fileinfo`): frissítés után `php artisan waypost:install --migrate`.
 
 ### Security
 
@@ -24,6 +24,7 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 - `waypost.guard` (`WAYPOST_GUARD`): a csomag guardjának neve; ha a gazdának már van ilyen nevű, más guardja, az alkalmazás hibával áll le (WP-BE-027).
 - `waypost.pull.settle_ms` (`WAYPOST_PULL_SETTLE_MS`, 5000): a pull ennyi ideig nem küldi a friss változásokat (WP-BE-022).
 - `composer test:types`: típuslefedettség, 100% (WP-BE-029).
+- A tesztek a csomag útvonalait a `waypost/schema` végponttáblájával (`endpoints.json`) vetik össze: név, metódus, útvonal, hívók, `Idempotency-Key`, a törzs sémája.
 - README: *Üzemeltetés* szakasz (az eszköztoken kockázata, `APP_KEY`-csere, mentés, frissítés, queue worker, több szerver, NTP, TrustProxies) (WP-BE-009, WP-BE-028).
 - CI: MySQL 8.4 és PostgreSQL 16, a legalacsonyabb függőségekkel is, `composer analyse`, `composer test:types`, `composer lint`, és a telepítés egy friss Laravel-alkalmazásba (`scripts/install-smoke.sh`) (WP-BE-007), a `waypost-schema` rögzített tagjén.
 - `X-Waypost-Schema` fejléc a csomag útvonalainak minden válaszában: a `waypost/schema` verziója (`Paths::VERSION`), amellyel a szerver dolgozik.
@@ -38,10 +39,13 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 - Index minden idegen kulcson PostgreSQL-en és SQLite-on is (új migráció; MySQL-en nem változik semmi) (WP-BE-006).
 - MIT licenc (`LICENSE`, a `composer.json`-ban eddig „proprietary”) (WP-BE-024).
 - Új követelmény: `ext-fileinfo`; `.gitattributes` (a kiadott archívumból kimaradnak a tesztek és a fejlesztői fájlok), `.editorconfig`, a `composer.json` metaadatai (WP-BE-023, WP-BE-024).
-- A `waypost/schema` függőség `^0.6`; a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal.
+- A `waypost/schema` függőség `^0.8` (a 0.7.0 és a 0.8.0 az audit javításai); a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal. A gyalogidők felső korlátja (86 400 s) a sémából jön: a nagyobb érték `422` az `500` helyett (WP-BE-013).
+- A `validation_failed` hibának mindig van `details`-e: a törzs egészét érintő hibánál (nem JSON, nem objektum, rossz tartalomtípus) és a keretrendszer saját 422-es hibájánál az üzenet az üres kulcs alatt (`{"": ["…"]}`; `waypost/schema` 0.8.0).
+- `POST /sync/push-final`: `done: false` mellett üres köteg nem küldhető (`422`; `waypost/schema` 0.8.0).
 
 ### Fixed
 
+- Menetrend-kibontás: az ablaknál hosszabb lépésű intervallumos menetrend (pl. naponta egyszer, `interval_every_min = 1440`) `ValueError`-ral leállt; most egy kört ad (a `waypost/schema` `every-1440` vektora).
 - Egy jelentés nem veszhet el egy küldés közben meghalt job miatt: a 15 percen belül el nem küldött foglalás felszabadul, és a túl nagy fotó nem bontódik ki a PDF-hez (WP-BE-004). Ha a küldés egy címzettnél bukik, a következő próbálkozás csak a maradéknak küld (`reports.delivered_to`, új migráció) (WP-BE-020).
 - A félbemaradt kérés `Idempotency-Key`-e 5 perc után újra futtatható, eddig 24 óráig `409`-et adott (WP-BE-003).
 - Egy hibás bejegyzés vetülete nem állítja meg a push többi bejegyzését: saját savepointban fut, a hiba a naplóba kerül, a bejegyzés alkalmazatlan marad (WP-BE-008).

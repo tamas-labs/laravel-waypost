@@ -99,6 +99,11 @@ final readonly class ErrorRenderer
         ?int $status = null,
     ): JsonResponse {
         $error = ['code' => $code->value, 'message' => $message ?? $code->message()];
+        // validation_failed always has details (api/error.json): an error of the request as a whole (not JSON, not
+        // an object, the framework's own 422) is its message under the empty key, as the schema's root error is.
+        if ($details === [] && $code === ErrorCode::ValidationFailed) {
+            $details = ['' => [$error['message']]];
+        }
         if ($details !== []) {
             // An object even if the keys look like list indexes.
             $error['details'] = (object) array_map(array_values(...), $details);

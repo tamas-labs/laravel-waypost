@@ -83,18 +83,21 @@ it('closes even if entries were rejected', function (): void {
 
 it('is forbidden for a device that is not revoked', function (bool $done): void {
     $device = Device::factory()->create();
+    // An empty batch only closes the upload (api/sync-push-final.request): a batch before that has an entry.
+    $entries = $done ? [] : [(new ChainBuilder($device))->shiftStarted()];
 
-    $response = pushAs($device, [], done: $done)->assertForbidden();
+    $response = pushAs($device, $entries, done: $done)->assertForbidden();
 
     expect($response)->toMatchSchema('api/error');
     expect($response->json('error.code'))->toBe('forbidden');
-    expect($device->refresh()->upload_closed_at)->toBeNull();
-})->with([true, false]);
+    expect($device->refresh()->upload_closed_at)->toBeNull()
+        ->and(ChainEntry::query()->count())->toBe(0);
+})->with(['closing' => true, 'a batch' => false]);
 
 it('refuses X-Acting-User with the token of a revoked device', function (): void {
     $device = Device::factory()->revoked()->create();
 
-    requestApi('POST', 'sync/push-final', ['Authorization' => 'Bearer ' . deviceToken($device), 'X-Acting-User' => Uuid::v7()], ['device_id' => $device->id, 'entries' => [], 'done' => false])
+    requestApi('POST', 'sync/push-final', ['Authorization' => 'Bearer ' . deviceToken($device), 'X-Acting-User' => Uuid::v7()], ['device_id' => $device->id, 'entries' => [], 'done' => true])
         ->assertUnauthorized()
         ->assertJsonPath('error.code', 'device_revoked');
 });

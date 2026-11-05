@@ -6,8 +6,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use Waypost\Http\Middleware\Authenticate;
+use Waypost\Http\Middleware\HandleIdempotencyKey;
+use Waypost\Http\Middleware\ValidateSchema;
 use Waypost\Models\Device;
 use Waypost\Models\Site;
+use Waypost\Schema\Paths;
 use Waypost\Support\Uuid;
 
 pest()->use(RefreshDatabase::class);
@@ -71,6 +74,49 @@ it('has the endpoints of the spec', function (): void {
         'sync.pull', 'sync.push', 'sync.push-final',
         'users.destroy', 'users.index', 'users.pin', 'users.show', 'users.store', 'users.update',
     ]);
+});
+
+it('matches the endpoint table of the contract', function (): void {
+    /** @var array{endpoints: list<array{name: string, method: string, path: string, auth: list<string>, idempotency_key: bool, request: array{content_type: string, schema: string}|null}>} $table */
+    $table = json_decode((string) file_get_contents(Paths::endpoints()), true, flags: JSON_THROW_ON_ERROR);
+    $expected = [];
+    foreach ($table['endpoints'] as $endpoint) {
+        $expected[$endpoint['name']] = [
+            $endpoint['method'],
+            $endpoint['path'],
+            // No token: login, or a signed URL (checked by the controller).
+            array_values(array_diff($endpoint['auth'], ['none', 'signed_url'])),
+            $endpoint['idempotency_key'],
+            // A multipart body is checked by the controller (MediaController), a JSON body by ValidateSchema.
+            ($endpoint['request']['content_type'] ?? null) === 'application/json' ? $endpoint['request']['schema'] : null,
+        ];
+    }
+    ksort($expected);
+
+    $actual = [];
+    foreach (Route::getRoutes()->getRoutes() as $route) {
+        /** @var RoutingRoute $route */
+        $name = (string) $route->getName();
+        if (!str_starts_with($name, 'waypost.')) {
+            continue;
+        }
+        $middleware = array_map(strval(...), $route->gatherMiddleware());
+        $parameters = static fn (string $class): ?string => array_values(array_filter(array_map(
+            static fn (string $entry): ?string => str_starts_with($entry, "{$class}:") ? substr($entry, strlen($class) + 1) : null,
+            $middleware,
+        )))[0] ?? null;
+        $callers = $parameters(Authenticate::class);
+        $actual[substr($name, strlen('waypost.'))] = [
+            array_values(array_diff($route->methods(), ['HEAD']))[0],
+            substr($route->uri(), strlen('api/waypost/v1')),
+            $callers === null ? [] : explode(',', $callers),
+            in_array(HandleIdempotencyKey::class, $middleware, true),
+            $parameters(ValidateSchema::class),
+        ];
+    }
+    ksort($actual);
+
+    expect($actual)->toBe($expected);
 });
 
 it('needs a token on every endpoint but login and the signed files', function (): void {

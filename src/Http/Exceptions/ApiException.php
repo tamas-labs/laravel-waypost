@@ -47,9 +47,9 @@ final class ApiException extends HttpException
         return new self(ErrorCode::Conflict, $message, $details);
     }
 
-    /** A malformed request body as a whole (not a field of it). */
+    /** A malformed request body as a whole (not a field of it): the message is also its detail, under the empty key. */
     public static function invalidBody(string $message): self
     {
-        return new self(ErrorCode::ValidationFailed, $message);
+        return new self(ErrorCode::ValidationFailed, $message, ['' => [$message]]);
     }
 }

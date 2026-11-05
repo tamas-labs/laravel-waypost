@@ -209,3 +209,12 @@ it('renders an unauthenticated request of the host application as before', funct
 
     getJson('host/private')->assertUnauthorized()->assertJsonPath('message', 'Unauthenticated.');
 });
+
+it('gives validation_failed its details even without fields', function (): void {
+    // The framework's own 422 (abort, a non-validation exception): the message under the empty key.
+    Route::get('api/waypost/v1/_test/abort-422', fn () => abort(422));
+
+    $response = getJson('api/waypost/v1/_test/abort-422')->assertUnprocessable();
+
+    expect(errorOf($response))->toBe(['code' => 'validation_failed', 'message' => 'A megadott adatok hibásak.', 'details' => ['' => ['A megadott adatok hibásak.']]]);
+});

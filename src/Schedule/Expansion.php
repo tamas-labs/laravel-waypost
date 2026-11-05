@@ -102,7 +102,13 @@ final class Expansion
             $to += self::MINUTES_PER_DAY;
         }
 
-        return range($from, $to, $schedule->interval_every_min);
+        // Not range(): it throws if the step is longer than the window (e.g. every 1440 minutes).
+        $minutes = [];
+        for ($minute = $from; $minute <= $to; $minute += $schedule->interval_every_min) {
+            $minutes[] = $minute;
+        }
+
+        return $minutes;
     }
 
     /**

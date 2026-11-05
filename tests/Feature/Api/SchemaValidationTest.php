@@ -41,7 +41,7 @@ function detailsOf(TestResponse $response): ?array
 function validPush(): array
 {
     /** @var array<string, mixed> */
-    return json_decode((string) file_get_contents(Waypost\Schema\Paths::root() . '/examples/api/sync-push.request/valid/two-entries.json'), true);
+    return json_decode((string) file_get_contents(Waypost\Schema\Paths::examplesDirectory() . '/api/sync-push.request/valid/two-entries.json'), true);
 }
 
 it('passes a valid body through, untouched by the host\'s middleware', function (): void {
@@ -104,7 +104,8 @@ it('refuses a body that is not a JSON object', function (string $content, ?strin
         'HTTP_ACCEPT' => 'application/json',
     ]), content: $content);
 
-    expect(detailsOf($response))->toBeNull();
+    // The body as a whole: the message under the empty key (api/error.json requires details).
+    expect(detailsOf($response))->toBe(['' => [$message]]);
     expect($response->json('error.message'))->toBe($message);
 })->with([
     'not JSON' => ['{"email": ', 'application/json', 'A kérés törzse nem érvényes JSON.'],
@@ -117,7 +118,7 @@ it('refuses a body that is not a JSON object', function (string $content, ?strin
 it('agrees with the examples of every request schema', function (): void {
     $validator = app(SchemaValidator::class);
     $checked = 0;
-    foreach (glob(Waypost\Schema\Paths::root() . '/examples/api/*.request/*/*.json') ?: [] as $file) {
+    foreach (glob(Waypost\Schema\Paths::examplesDirectory() . '/api/*.request/*/*.json') ?: [] as $file) {
         $schema = 'api/' . basename(dirname($file, 2));
         $errors = $validator->errors(json_decode((string) file_get_contents($file)), $schema);
 

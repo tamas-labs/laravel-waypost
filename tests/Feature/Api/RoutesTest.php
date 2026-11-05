@@ -124,6 +124,24 @@ it('checks the checkpoints of a new version', function (array $points, array $de
     'walk time at the first position' => [[['a', 10]], ['checkpoints.0.walk_time_from_prev_s' => ['Az első pontnál nem adható meg.']]],
 ]);
 
+it('takes walk times up to a day', function (int $seconds, int $status): void {
+    [, $supervisor, $route, $a, $b] = routeWithCheckpoints();
+    $body = ['walk_duration_s' => $seconds, 'checkpoints' => [['checkpoint_id' => $a->id, 'walk_time_from_prev_s' => null], ['checkpoint_id' => $b->id, 'walk_time_from_prev_s' => $seconds]]];
+
+    $response = callApi('POST', "routes/{$route->id}/versions", $supervisor, $body)->assertStatus($status);
+
+    // Above the schema's maximum (WP-BE-013): refused before the database, whose column it would overflow.
+    expect(RouteVersion::query()->count())->toBe($status === 201 ? 1 : 0);
+    if ($status === 422) {
+        expect($response)->toMatchSchema('api/error');
+        expect(array_keys($response->json('error.details')))->toBe(['walk_duration_s', 'checkpoints.1.walk_time_from_prev_s']);
+    }
+})->with([
+    'a day' => [86_400, 201],
+    'more' => [86_401, 422],
+    'far more' => [2_147_483_648, 422],
+]);
+
 it('never changes a version', function (string $method): void {
     [, $supervisor, $route, $a] = routeWithCheckpoints();
     $version = callApi('POST', "routes/{$route->id}/versions", $supervisor, ['checkpoints' => [['checkpoint_id' => $a->id]]])->json('route_version.id');
