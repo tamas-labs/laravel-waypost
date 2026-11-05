@@ -8,7 +8,7 @@ A csomag a gazda-alkalmazás tábláihoz nem nyúl: minden táblája `waypost_` 
 
 ## Követelmények
 
-- PHP 8.4, `gd` bővítménnyel (a PDF-jelentések bélyegképeihez)
+- PHP 8.4, `gd` (a PDF-jelentések bélyegképeihez) és `fileinfo` bővítménnyel (a feltöltött fotó típusának ellenőrzéséhez)
 - Laravel 13
 - MySQL 8.4 vagy PostgreSQL 16; a telepítési próba SQLite-on is lefut
 - a `waypost/schema` csomag (a közös JSON Schema szerződés, a `waypost-schema` repo)

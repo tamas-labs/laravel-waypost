@@ -429,6 +429,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Függőségek*.
 - **Javítási irány:** `"ext-fileinfo": "*"` a `require`-be.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): `"ext-fileinfo": "*"` a `composer.json` `require`-jében, a README követelményei között, és a CI `setup-php` lépésében kifejezetten.
 
 ### WP-BE-024 – Nincs `.gitattributes` (export-ignore), LICENSE fájl és teljes Composer-metaadat
 

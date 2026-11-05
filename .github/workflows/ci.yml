@@ -63,7 +63,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: bcmath, gd, intl, pcntl, pdo_mysql, pdo_pgsql, zip
+          extensions: bcmath, fileinfo, gd, intl, pcntl, pdo_mysql, pdo_pgsql, zip
           coverage: none
       - if: matrix.dependencies == 'stable'
         run: composer install --no-interaction --no-progress
@@ -102,6 +102,6 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: bcmath, gd, intl, pdo_sqlite, zip
+          extensions: bcmath, fileinfo, gd, intl, pdo_sqlite, zip
           coverage: none
       - run: sh scripts/install-smoke.sh
