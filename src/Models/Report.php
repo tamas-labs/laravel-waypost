@@ -23,6 +23,7 @@ use Waypost\Enums\ReportFrequency;
  * @property Carbon|null $sent_at
  * @property string|null $path
  * @property list<string> $recipients
+ * @property list<string>|null $delivered_to  the recipients sent to so far; null: none yet
  */
 #[UseFactory(ReportFactory::class)]
 final class Report extends Model
@@ -41,6 +42,7 @@ final class Report extends Model
             'generated_at' => 'datetime',
             'sent_at' => 'datetime',
             'recipients' => 'array',
+            'delivered_to' => 'array',
         ];
     }
 

@@ -387,6 +387,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Specifikáció, *Jelentések* (egy kiküldött jelentés nem megy ki újra); `decisions.md` „A műszakjelentés (M6-05)”.
 - **Javítási irány:** A már kiküldött címzettek tárolása a `reports` sorban, és újrapróbáláskor csak a maradékra küldeni; vagy címzettenként külön, egyedi (`report_id`, `address`) job.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): új oszlop `reports.delivered_to` (`2026_11_05_000019_add_waypost_reports_delivered_to.php`), amelyet a `ReportSender` minden elküldött levél után ír. Részleges hibánál a foglalás nem törlődik, hanem azonnal elhagyottá válik, és a következő próbálkozás (ahogy egy elhalt jobé után is) csak a még el nem ért címzetteknek küld. Teszt: `ReportSenderTest`; döntés: `docs/decisions.md` (A műszakjelentés / Részleges küldés).
 
 ### WP-BE-021 – A pull egy lapja minden táblából 501 sort, az útvonalverzióknál a pontjaikkal együtt tölt be
 
