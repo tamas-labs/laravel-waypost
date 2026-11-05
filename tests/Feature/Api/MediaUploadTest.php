@@ -16,6 +16,7 @@ use Waypost\Support\Uuid;
 use Waypost\Tests\Fixtures\ChainBuilder;
 
 use function Pest\Laravel\call;
+use function Pest\Laravel\travelTo;
 
 pest()->use(RefreshDatabase::class);
 
@@ -92,6 +93,25 @@ it('stores the photo of an entry on the private disk', function (): void {
     Storage::disk('local')->assertExists("waypost/media/{$id}.jpg");
     expect(Storage::disk('local')->get("waypost/media/{$id}.jpg"))->toBe($bytes)
         ->and(Storage::disk('local')->getVisibility("waypost/media/{$id}.jpg"))->toBe('private');
+});
+
+it('takes no taken_at later than the server\'s time, before or after the upload', function (): void {
+    $device = Device::factory()->create();
+    $chain = new ChainBuilder($device);
+    $shift = $chain->shiftStarted();
+    $bytes = jpegBytes();
+    $photoId = Uuid::v7();
+    $incident = $chain->incident($shift['payload']['shift_id'], ['media' => [['id' => $photoId, 'sha256' => hash('sha256', $bytes)]]], ['device_time' => '2036-10-27T20:00:00.000Z']);
+    travelTo(Time::fromIso('2026-10-27T20:10:00.000Z'));
+    pushAs($device, [$shift, $incident])->assertOk();
+
+    expect(Time::iso(Media::query()->findOrFail($photoId)->taken_at))->toBe('2026-10-27T20:10:00.000Z');
+
+    travelTo(Time::fromIso('2026-10-27T20:15:00.000Z'));
+    $fields = [...photoFields('incident', $incident['payload']['incident_id'], $bytes), 'taken_at' => '2036-10-27T20:04:05.123Z'];
+    $response = uploadMedia($photoId, $fields, deviceHeader($device), $bytes)->assertOk();
+
+    expect($response->json('media.taken_at'))->toBe('2026-10-27T20:15:00.000Z');
 });
 
 it('gives the photo of a manual entry to its scan, and its incident cites the same', function (): void {

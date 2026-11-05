@@ -304,6 +304,7 @@ Nincs ilyen megállapítás.
   - a link lejárata és a törlés a szerver idejéből (`received_at` / `uploaded_at`) számolódjon, vagy a `taken_at` legyen a bejegyzés `received_at`-jéhez szorítva;
   - jövőbeli `taken_at` (pl. > most + 1 nap) elutasítása.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `taken_at` nem lehet későbbi a szerver idejénél. A helyőrző sorban (`Projector`) legfeljebb a bejegyzés `received_at`-je, feltöltéskor (`MediaController`) legfeljebb a feltöltés ideje. Így a link lejárata és a `taken_at` szerinti törlés legkésőbb a megőrzési idővel a szerverre érkezés után jön el. A jövőbeli `taken_at` elutasítása szerződésváltozás lenne, és egy rossz órájú telefon fotóit veszítené el, ezért a szerver levágja. Teszt: `MediaUploadTest`; döntés: `docs/decisions.md` (Aláírt URL-ek / Élettartam).
 
 ### WP-BE-015 – A még nem létező pontra feltöltött pontfotó soha nem törlődik
 

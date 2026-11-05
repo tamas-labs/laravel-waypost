@@ -77,7 +77,8 @@ final class Projector
                 'owner_type' => $owner,
                 'owner_id' => $entry->payload[$ownerKey],
                 'sha256' => $photo['sha256'],
-                'taken_at' => $entry->device_time,
+                // Not after the entry arrived: a phone clock ahead must not keep the photo past its retention.
+                'taken_at' => $entry->device_time->isAfter($entry->received_at) ? $entry->received_at : $entry->device_time,
             ]);
         }
     }

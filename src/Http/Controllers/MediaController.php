@@ -55,12 +55,16 @@ final class MediaController extends Controller
         }
 
         if ($photo->uploaded_at === null) {
+            $now = Time::now();
+            $takenAt = Time::fromIso($fields['taken_at']);
             $photo->fill([
                 'mime' => self::JPEG,
                 'size_bytes' => $file->getSize(),
                 'path' => self::store($file, $media),
-                'taken_at' => Time::fromIso($fields['taken_at']),
-                'uploaded_at' => Time::now(),
+                // Not after the upload: the photo's link lives and its file is kept by taken_at (SignedUrls::photo(),
+                // PruneExpiredData), and the retention is the server's rule, not the phone clock's.
+                'taken_at' => $takenAt->isAfter($now) ? $now : $takenAt,
+                'uploaded_at' => $now,
             ])->save();
         }
 
