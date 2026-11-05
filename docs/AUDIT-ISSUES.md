@@ -77,6 +77,7 @@ Nincs ilyen megállapítás.
   - ha nem egyezik: vetület nélkül tárolás, és egy szerverjelölés (új `ChainFlag`, előbb a sémában), vagy a jelentés hibás bejegyzésként jelölje;
   - teszt: idegen telephely hivatkozása minden bejegyzéstípusban.
 - **Bizonyosság:** magas a hiányzó ellenőrzésre, közepes a gyakorlati valószínűségre (érvényes HMAC kell hozzá, tehát az eszköz titka vagy hibás app).
+- **Állapot:** javítva (2026-11-05): a `Projector` az útvonalverziót, a menetrendet (a verzió útvonaláén) és a pontot csak az eszköz telephelyéről, az incidens leolvasását csak az eszköz saját láncából fogadja el; minden más ismeretlen hivatkozás, a bejegyzés vetület nélkül marad (`projected_at = null`, a jelentésben „nem teljes adat”). Sémaváltozás és új szerverjelölés nem kellett. Teszt: `ProjectorTest`; döntés: `docs/decisions.md` (Halasztott vetület / Hatókör).
 
 ### WP-BE-003 – Félbeszakadt kérés után 24 órán át „még fut” marad az idempotenciakulcs, és ez megállítja az outboxot
 

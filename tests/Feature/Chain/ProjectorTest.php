@@ -328,7 +328,43 @@ it('does not let an entry touch the shift or round of another device', function 
         ->and(Round::query()->sole()->status)->toBe(RoundStatus::Open);
 });
 
-it('takes a checkpoint, a guard and a schedule that were deleted since', function (): void {
+it('never applies an entry that refers to another site, or to another device\'s scan', function (string $case): void {
+    [$device, $chain, $projector] = projecting();
+    [$version, $schedule, [$checkpoint]] = routeOf((string) $device->site_id, [null]);
+    [$shiftId, $roundId] = openRound($device, $chain, $projector, $version, $schedule);
+    $otherSite = Site::factory()->create();
+    [$foreignVersion, $foreignSchedule, [$foreignCheckpoint]] = routeOf($otherSite->id, [null]);
+    // Another route of the same site: its schedule does not go with the version.
+    [, $otherRouteSchedule] = routeOf((string) $device->site_id, [null]);
+    // A scan in the chain of the other site's phone.
+    $otherDevice = Device::factory()->for($otherSite)->create();
+    $otherChain = new ChainBuilder($otherDevice);
+    $otherShift = $otherChain->shiftStarted();
+    $otherScan = $otherChain->scan(null, $foreignCheckpoint->id);
+    expect($projector->apply($otherDevice, storedEntry($otherShift)))->toBeTrue()
+        ->and($projector->apply($otherDevice, storedEntry($otherScan)))->toBeTrue();
+
+    $data = match ($case) {
+        'route version' => $chain->roundOpened($shiftId, $foreignVersion->id, $schedule->id),
+        'schedule' => $chain->roundOpened($shiftId, $foreignVersion->id, $foreignSchedule->id),
+        'schedule of another route' => $chain->roundOpened($shiftId, $version->id, $otherRouteSchedule->id),
+        'checkpoint of a round' => $chain->scan($roundId, $foreignCheckpoint->id),
+        'checkpoint outside a round' => $chain->scan(null, $foreignCheckpoint->id),
+        'nearest checkpoint' => $chain->incident($shiftId, ['nearest_checkpoint_id' => $foreignCheckpoint->id]),
+        'scan of the incident' => $chain->incident($shiftId, ['scan_id' => $otherScan['payload']['scan_id']]),
+        default => throw new LogicException($case),
+    };
+
+    expect($projector->apply($device, storedEntry($data)))->toBeFalse();
+    expect(Round::query()->count())->toBe(1)
+        ->and(Scan::query()->count())->toBe(1)
+        ->and(Incident::query()->count())->toBe(0);
+})->with([
+    'route version', 'schedule', 'schedule of another route', 'checkpoint of a round', 'checkpoint outside a round',
+    'nearest checkpoint', 'scan of the incident',
+]);
+
+it('takes a checkpoint, a guard, a route and a schedule that were deleted since', function (): void {
     [$device, $chain, $projector] = projecting();
     [$version, $schedule, [$checkpoint]] = routeOf((string) $device->site_id, [null]);
     $guard = User::factory()->create();
@@ -337,6 +373,7 @@ it('takes a checkpoint, a guard and a schedule that were deleted since', functio
     $scan = $chain->scan($round['payload']['round_id'], $checkpoint->id);
     $guard->delete();
     $schedule->delete();
+    $version->route()->firstOrFail()->delete();
     $checkpoint->delete();
 
     expect($projector->apply($device, storedEntry($shift)))->toBeTrue()

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waypost\Chain;
 
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Waypost\Enums\ChainEntryType;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\RoundStatus;
@@ -32,6 +33,10 @@ use Waypost\Support\Time;
  * An entry may refer to something that is not on the server yet: the phone pushes before its outbox (a checkpoint
  * trained offline). apply() then answers false and writes nothing but the media rows, and the entry is applied by a
  * later push. Entries are therefore applied independently of each other, in whatever order they become applicable.
+ *
+ * Whatever an entry refers to is the device's own: its shifts and rounds, and the route versions, schedules, checkpoints
+ * and scans of its site. Anything else counts as unknown, so the entry is never applied (projected_at stays null, and
+ * the report says the data is incomplete): a phone's chain cannot bring another site's names into its site's report.
  */
 final class Projector
 {
@@ -140,9 +145,10 @@ final class Projector
         if (Round::query()->whereKey($payload['round_id'])->exists()) {
             return true;
         }
+        $version = $this->routeVersion($device, $payload['route_version_id']);
         if ($this->shift($device, $payload['shift_id']) === null
-            || !RouteVersion::query()->whereKey($payload['route_version_id'])->exists()
-            || !Schedule::withTrashed()->whereKey($payload['schedule_id'])->exists()) {
+            || $version === null
+            || !Schedule::withTrashed()->whereKey($payload['schedule_id'])->where('route_id', $version->route_id)->exists()) {
             return false;
         }
 
@@ -179,7 +185,7 @@ final class Projector
             return true;
         }
         $round = $payload['round_id'] === null ? null : $this->round($device, $payload['round_id']);
-        $checkpoint = $payload['checkpoint_id'] === null ? null : Checkpoint::withTrashed()->whereKey($payload['checkpoint_id'])->first();
+        $checkpoint = $payload['checkpoint_id'] === null ? null : $this->checkpoint($device, $payload['checkpoint_id'])->first();
         if (($payload['round_id'] !== null && $round === null) || ($payload['checkpoint_id'] !== null && $checkpoint === null)) {
             return false;
         }
@@ -265,8 +271,8 @@ final class Projector
             return true;
         }
         if ($this->shift($device, $payload['shift_id']) === null
-            || ($payload['nearest_checkpoint_id'] !== null && !Checkpoint::withTrashed()->whereKey($payload['nearest_checkpoint_id'])->exists())
-            || ($payload['scan_id'] !== null && !Scan::query()->whereKey($payload['scan_id'])->exists())) {
+            || ($payload['nearest_checkpoint_id'] !== null && !$this->checkpoint($device, $payload['nearest_checkpoint_id'])->exists())
+            || ($payload['scan_id'] !== null && !$this->deviceScan($device, $payload['scan_id'])->exists())) {
             return false;
         }
 
@@ -296,5 +302,34 @@ final class Projector
     private function round(Device $device, string $id): ?Round
     {
         return Round::query()->whereKey($id)->whereHas('shift', fn ($shift) => $shift->where('device_id', $device->id))->first();
+    }
+
+    /** A version of a route of the device's site; the route may have been deleted since. */
+    private function routeVersion(Device $device, string $id): ?RouteVersion
+    {
+        return RouteVersion::query()
+            ->whereKey($id)
+            ->whereHas('route', fn (Builder $route) => $route->withTrashed()->where('site_id', $device->site_id))
+            ->first();
+    }
+
+    /**
+     * A checkpoint of the device's site, also one deleted since.
+     *
+     * @return Builder<Checkpoint>
+     */
+    private function checkpoint(Device $device, string $id): Builder
+    {
+        return Checkpoint::withTrashed()->whereKey($id)->where('site_id', $device->site_id);
+    }
+
+    /**
+     * A scan in this device's chain.
+     *
+     * @return Builder<Scan>
+     */
+    private function deviceScan(Device $device, string $id): Builder
+    {
+        return Scan::query()->whereKey($id)->whereHas('chainEntry', fn (Builder $entry) => $entry->where('device_id', $device->id));
     }
 }
