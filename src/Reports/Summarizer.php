@@ -8,7 +8,6 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 use InvalidArgumentException;
-use LogicException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
@@ -20,13 +19,9 @@ use Waypost\Models\DeviceDiagnostic;
 use Waypost\Models\Incident;
 use Waypost\Models\Media;
 use Waypost\Models\Round;
-use Waypost\Models\Route;
-use Waypost\Models\RouteVersion;
 use Waypost\Models\Scan;
-use Waypost\Models\Schedule;
 use Waypost\Models\Shift;
 use Waypost\Models\Site;
-use Waypost\Schedule\Deadline;
 use Waypost\Schedule\Expansion;
 use Waypost\Support\Time;
 
@@ -86,84 +81,18 @@ final class Summarizer
         $searchStart = self::midnight(self::addDays($fromDate, -self::MARGIN_DAYS), $zone);
         $inPeriod = fn (string $day): bool => $day >= $fromDate && $day <= $toDate;
 
-        /** @var Collection<string, Route> $routes */
-        $routes = Route::query()->withTrashed()->where('site_id', $site->id)
-            ->with(['versions' => fn ($versions) => $versions->with('points')->orderBy('created_at')->orderBy('version')])
-            ->get()->keyBy('id');
-        /** @var Collection<string, Schedule> $schedules */
-        $schedules = Schedule::query()->withTrashed()->whereIn('route_id', $routes->keys()->all())->get()->keyBy('id');
-
-        // The start day of every time of the schedules around the period, by schedule and instant.
-        $startDays = [];
-        $expected = [];
-        foreach ($schedules as $schedule) {
-            foreach (Expansion::expand($schedule, $site->timezone, self::addDays($fromDate, -self::MARGIN_DAYS), self::addDays($toDate, 1)) as $time) {
-                $startDays[self::key($schedule->id, $time->utc)] = $time->startDay;
-                $route = $routes->get($schedule->route_id);
-                if ($route !== null && $inPeriod($time->startDay) && self::expects($route, $schedule, $time->utc)) {
-                    $expected[self::key($schedule->id, $time->utc)] = [$schedule, $route, $time->startDay, $time->utc];
-                }
-            }
-        }
-        $startDayOf = fn (Round $round): string => $startDays[self::key($round->schedule_id, $round->scheduled_at)]
-            ?? self::localDate($round->scheduled_at, $zone);
+        $expected = ExpectedRounds::of($site, $fromDate, $toDate, self::addDays($fromDate, -self::MARGIN_DAYS));
 
         $shifts = $this->shifts($site, $periodStart, $searchStart, $searchEnd);
         $shiftDays = [];
         foreach ($shifts as $shift) {
-            $days = $shift->rounds->map($startDayOf)->sort()->values();
+            $days = $shift->rounds->map($expected->startDayOf(...))->sort()->values();
             $shiftDays[$shift->id] = $days->first() ?? self::localDate($shift->started_at, $zone);
         }
 
-        // The rows: the rounds of the period's days, then the expected times without one.
-        $rows = [];
-        foreach ($shifts->flatMap(fn (Shift $shift) => $shift->rounds) as $round) {
-            /** @var Round $round */
-            $day = $startDayOf($round);
-            if (!$inPeriod($day)) {
-                continue;
-            }
-            $key = self::key($round->schedule_id, $round->scheduled_at);
-            $version = $round->routeVersion ?? throw new LogicException('A round has its route version.');
-            $rows[] = ['day' => $day, 'route' => $version->route_id, 'schedule' => $round->schedule_id, 'at' => CarbonImmutable::instance($round->scheduled_at),
-                'limit' => $round->time_limit_min, 'expected' => isset($expected[$key]), 'round' => $round, 'version' => $version];
-            unset($expected[$key]);
-        }
-        foreach ($expected as [$schedule, $route, $day, $at]) {
-            $rows[] = ['day' => $day, 'route' => $route->id, 'schedule' => $schedule->id, 'at' => $at,
-                'limit' => $schedule->time_limit_min, 'expected' => true, 'round' => null, 'version' => self::versionAt($route, $at)];
-        }
-
-        $dayTimes = [];
-        foreach ($rows as $row) {
-            $dayTimes["{$row['route']}|{$row['day']}"][] = $row['at'];
-        }
-        $rounds = array_map(function (array $row) use ($dayTimes, $now): RoundRow {
-            $deadline = Deadline::of($row['at'], $row['limit'], $dayTimes["{$row['route']}|{$row['day']}"]);
-            $round = $row['round'];
-            $scans = $round === null ? [] : array_values($round->scans->sortBy(fn (Scan $scan) => Time::milliseconds($scan->scanned_at))->all());
-            $scanned = array_map(fn (Scan $scan): ?string => $scan->checkpoint_id, $scans);
-            $points = $row['version'] === null ? [] : $row['version']->points->sortBy('position')->pluck('checkpoint_id')->all();
-
-            return new RoundRow(
-                startDay: $row['day'],
-                routeId: $row['route'],
-                scheduleId: $row['schedule'],
-                scheduledAt: $row['at'],
-                timeLimitMin: $row['limit'],
-                deadline: $deadline,
-                expected: $row['expected'],
-                round: $round,
-                version: $row['version'],
-                outcome: match (true) {
-                    $round !== null => RoundOutcome::of($round->status),
-                    $deadline->lessThanOrEqualTo($now) => RoundOutcome::Missed,
-                    default => RoundOutcome::Upcoming,
-                },
-                scans: $scans,
-                missingCheckpointIds: array_values(array_diff(array_map(strval(...), $points), $scanned)),
-            );
-        }, $rows);
+        /** @var iterable<Round> $opened */
+        $opened = $shifts->flatMap(fn (Shift $shift) => $shift->rounds);
+        $rounds = RoundRows::of($opened, $expected, $inPeriod, $now);
         if ($only !== null) {
             // The shift's rounds, and the times it missed: due while it was open, with no round of any shift.
             $rounds = array_values(array_filter($rounds, fn (RoundRow $row): bool => $row->round === null
@@ -380,30 +309,6 @@ final class Summarizer
         }
 
         return $reasons;
-    }
-
-    /** Whether the schedule expects a round at the time: both it and its route are active, existed then, and the route had a trained version. */
-    private static function expects(Route $route, Schedule $schedule, CarbonImmutable $at): bool
-    {
-        foreach ([$route, $schedule] as $record) {
-            if (!$record->active || ($record->created_at !== null && $record->created_at->greaterThan($at))
-                || ($record->deleted_at !== null && $record->deleted_at->lessThanOrEqualTo($at))) {
-                return false;
-            }
-        }
-
-        return self::versionAt($route, $at) !== null;
-    }
-
-    /** The route's latest version at the time. */
-    private static function versionAt(Route $route, CarbonImmutable $at): ?RouteVersion
-    {
-        return $route->versions->last(fn (RouteVersion $version): bool => $version->created_at === null || $version->created_at->lessThanOrEqualTo($at));
-    }
-
-    private static function key(string $scheduleId, DateTimeInterface $at): string
-    {
-        return $scheduleId . '|' . Time::milliseconds($at);
     }
 
     /** The UTC instant of a local date's midnight (by the schedule rules, should midnight not exist). */

@@ -468,6 +468,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Kódminőség (SOLID, KISS)*.
 - **Javítási irány:** A várt körök (`ExpectedRounds`) és a sorépítés (`RoundRowBuilder`) kiemelése saját osztályba, a meglévő tesztekkel mint biztonsági hálóval.
 - **Bizonyosság:** magas (minőségi megállapítás).
+- **Állapot:** javítva (2026-11-05): a menetrend kibontása a várt időpontokra és a körök kezdőnapja az `ExpectedRounds`-ba, a körsorok építése (határidő, kimenet, leolvasások, hiányzó pontok) a `RoundRows`-ba került. A `summarize()` ezeket rakja össze. A viselkedés nem változott: a `Reports` tesztek változtatás nélkül zöldek. Döntés: `docs/decisions.md` (A jelentésadat-összesítő / Felépítés).
 
 ### WP-BE-026 – Az aláírt fotólink minden fotónál újra lekérdezi a telephely megőrzési idejét (N+1)
 
