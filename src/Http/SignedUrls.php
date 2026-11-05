@@ -29,10 +29,14 @@ final class SignedUrls
     {
     }
 
-    /** The link of an uploaded photo of the site, null if it is not uploaded or the retention has already deleted it. */
-    public static function photo(Media $media, Site $site): ?string
+    /**
+     * The link of an uploaded photo of the site, null if it is not uploaded or the retention has already deleted it.
+     *
+     * @param  int|null  $retentionDays  Retention::days() of the site, if already counted
+     */
+    public static function photo(Media $media, Site $site, ?int $retentionDays = null): ?string
     {
-        $expires = Retention::until($site, $media->taken_at);
+        $expires = Retention::until($site, $media->taken_at, $retentionDays);
         if ($media->uploaded_at === null || !$expires->isFuture()) {
             return null;
         }

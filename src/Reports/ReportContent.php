@@ -56,6 +56,9 @@ final class ReportContent
     /** @var Collection<int, Media> */
     private Collection $media;
 
+    /** Retention::days() of the site: the photo links live this long. */
+    private int $retentionDays;
+
     /**
      * @param  (Closure(Media): ?string)|null  $embed  the photo as a data URI for a PDF (Thumbnails::dataUri()),
      *                                                null: the photo's signed link (an e-mail)
@@ -64,6 +67,8 @@ final class ReportContent
     {
         $site = $summary->site;
         $this->format = new LocalFormat($site->timezone);
+        // Once per report, not per photo link.
+        $this->retentionDays = Retention::days($site);
         $this->checkpoints = Checkpoint::withTrashed()->where('site_id', $site->id)->get()->keyBy('id');
         $this->routes = Route::withTrashed()->where('site_id', $site->id)->get()->keyBy('id');
         $scanIds = [
@@ -107,7 +112,7 @@ final class ReportContent
             'incidents' => array_map($content->incident(...), $summary->incidents),
             'outside' => array_map($content->outsideScan(...), $summary->scansOutsideRounds),
             'chain' => self::chain($summary),
-            'photoLinkDays' => Retention::days($summary->site),
+            'photoLinkDays' => $content->retentionDays,
         ];
     }
 
@@ -169,7 +174,7 @@ final class ReportContent
                 ...$content->incident($incident),
             ], $summary->incidents),
             'chain' => self::chain($summary),
-            'photoLinkDays' => Retention::days($summary->site),
+            'photoLinkDays' => $content->retentionDays,
             'generated_at' => $format->dateOf($summary->generatedAt) . ' ' . $format->time($summary->generatedAt),
         ];
     }
@@ -294,7 +299,7 @@ final class ReportContent
             || ($incident->scan_id !== null && $media->owner_type === Scan::class && $media->owner_id === $incident->scan_id));
         $links = [];
         foreach ($photos as $photo) {
-            $url = $this->embed === null ? SignedUrls::photo($photo, $this->summary->site) : ($this->embed)($photo);
+            $url = $this->embed === null ? SignedUrls::photo($photo, $this->summary->site, $this->retentionDays) : ($this->embed)($photo);
             if ($url !== null) {
                 $links[] = ['url' => $url, 'thumb_url' => $url];
             }

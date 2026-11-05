@@ -480,6 +480,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Teljesítmény (N+1)*.
 - **Javítási irány:** A napok egyszeri kiszámolása jelentésenként, és átadása (`Retention::until($site, $time, $days)`).
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `ReportContent` a telephely megőrzési idejét jelentésenként egyszer számolja, és átadja a fotólinkeknek (`SignedUrls::photo($media, $site, $retentionDays)` → `Retention::until($site, $time, $days)`; a paraméter elhagyható). Teszt: `ShiftReportTest` (három fotónál egy lekérdezés).
 
 ### WP-BE-027 – A service provider az `auth.guards.waypost` kulcsot feltétel nélkül felülírja
 

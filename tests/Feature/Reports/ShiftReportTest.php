@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -11,10 +13,14 @@ use Waypost\Enums\ReportFrequency;
 use Waypost\Jobs\SendShiftReport;
 use Waypost\Mail\ReportMail;
 use Waypost\Models\Device;
+use Waypost\Models\Incident;
+use Waypost\Models\Media;
 use Waypost\Models\Report;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Site;
 use Waypost\Models\User;
+use Waypost\Reports\ReportContent;
+use Waypost\Reports\Summarizer;
 use Waypost\Support\Time;
 use Waypost\Support\Uuid;
 use Waypost\Tests\Fixtures\ChainBuilder;
@@ -181,6 +187,25 @@ it('waits for a missing photo and sends the report as soon as it has arrived', f
         ->and($mails[0]->content['incidents'][0]['photos'][0]['url'])->toContain("/media/{$shift['photo_id']}/file", 'signature=')
         ->and($mails[0]->content['incidents'][0]['photos_missing'])->toBe(0)
         ->and($mails[0]->content['incomplete'])->toBe([]);
+});
+
+it('counts the retention once per report, not once per photo link', function (): void {
+    $fixture = patrolledSite(['weekdays' => 127, 'start_times' => ['20:00'], 'time_limit_min' => 30]);
+    $phone = $fixture['phone'] ?? throw new LogicException('The site has its phone.');
+    $shift = shiftOf($phone, '2026-10-01T18:55:00.000Z', '2026-10-01T21:40:00.000Z');
+    $incident = Incident::factory()->create(['shift_id' => $shift->id, 'occurred_at' => Time::fromIso('2026-10-01T19:30:00.000Z')]);
+    Media::factory()->uploaded()->count(3)->create(['owner_type' => Incident::class, 'owner_id' => $incident->id, 'device_id' => $phone->id]);
+    $summary = app(Summarizer::class)->shift($shift);
+    $subscriptionQueries = 0;
+    $table = (new ReportSubscription())->getTable();
+    DB::listen(function (QueryExecuted $query) use (&$subscriptionQueries, $table): void {
+        $subscriptionQueries += str_contains($query->sql, $table) ? 1 : 0;
+    });
+
+    $content = ReportContent::shift($summary, $shift);
+
+    expect($content['incidents'][0]['photos'])->toHaveCount(3)
+        ->and($subscriptionQueries)->toBe(1);
 });
 
 it('sends the report without the photo after 30 minutes, and not again when it arrives', function (): void {

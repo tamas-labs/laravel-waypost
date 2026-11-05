@@ -43,9 +43,13 @@ final class Retention
         return max(self::MIN_DAYS, 2 * $longest);
     }
 
-    /** Until when data of the site from the given time is kept. */
-    public static function until(Site $site, DateTimeInterface $time): CarbonImmutable
+    /**
+     * Until when data of the site from the given time is kept.
+     *
+     * @param  int|null  $days  the site's days() already counted (a report with many photos), or null to count them
+     */
+    public static function until(Site $site, DateTimeInterface $time, ?int $days = null): CarbonImmutable
     {
-        return CarbonImmutable::instance($time)->utc()->addDays(self::days($site));
+        return CarbonImmutable::instance($time)->utc()->addDays($days ?? self::days($site));
     }
 }
