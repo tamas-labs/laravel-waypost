@@ -6,7 +6,9 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
-A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-042) és a `waypost/schema` 0.8.0. Három új migráció (`foreign key` indexek, `reports.delivered_to`, morph-aliasok) és új követelmény (`ext-fileinfo`): frissítés után `php artisan waypost:install --migrate`.
+## [0.3.0] – 2026-11-05
+
+A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-042) és a `waypost/schema` 0.8.0. Három új migráció (`foreign key` indexek, `reports.delivered_to`, morph-aliasok), új követelmény (`ext-fileinfo`) és új sémaverzió (`waypost/schema` `^0.8`): frissítés `composer update waypost/laravel-waypost waypost/schema`, utána `php artisan waypost:install --migrate`.
 
 ### Security
 

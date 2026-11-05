@@ -28,6 +28,9 @@ const RELEASED_MIGRATIONS = [
     '2026_10_28_000015_create_waypost_site_user_detachments_table.php' => '09f1907da05fbd37f066fbc626e047bebfaf9b87f36ff6b5c0fbcc98fc1f6138',
     '2026_11_02_000016_create_waypost_device_diagnostics_table.php' => '1750d5d4fdb49ecf11e15e5b4f4ac3af4555459b9a401e0978901ac60b9ea86e',
     '2026_11_04_000017_create_waypost_no_data_alerts_table.php' => 'b8e9032f0e2f3d73b235ff698b5f6165d0c49c26bc7f24f8290772e377931006',
+    '2026_11_05_000018_add_waypost_foreign_key_indexes.php' => '63bdbec0010da57bbb7355b64f9d2a7aa917a136c677999e1174c52e96f75fb6',
+    '2026_11_05_000019_add_waypost_reports_delivered_to.php' => '8e581b00fc6996672c75db0fb4314c1649c40db3877cc1436157eac887e4e9ac',
+    '2026_11_05_000020_use_waypost_morph_aliases.php' => 'cc8b1f23959b5451467b1d9570c8363e7fbe9a135de68dd3786689c5100b9e13',
 ];
 
 it('never changes a released migration', function (): void {
