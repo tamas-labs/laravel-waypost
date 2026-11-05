@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Console\Scheduling\Schedule as Scheduler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Waypost\Enums\IncidentCategory;
@@ -21,6 +22,7 @@ use Waypost\Models\Report;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\User;
 use Waypost\Reports\ReportContent;
+use Waypost\Reports\Thumbnails;
 use Illuminate\Support\Str;
 use Waypost\Support\Time;
 
@@ -167,6 +169,52 @@ it('sends the weekly report on Monday with its PDF, the photos embedded, and sto
     // The archive lists it with its link.
     $response = callApi('GET', 'reports', $fixture['supervisor'])->assertOk();
     expect($response->json('reports.0.download.url'))->toContain("/reports/{$report->id}/file");
+});
+
+it('sends the weekly report without the thumbnail of a photo too large to unpack', function (): void {
+    $fixture = periodReportSite(ReportFrequency::Weekly);
+    $phone = $fixture['phone'];
+    $shift = shiftOf($phone, '2026-11-03T18:55:00.000Z', '2026-11-03T21:40:00.000Z');
+    $incident = Incident::factory()->create(['shift_id' => $shift->id, 'category' => IncidentCategory::OpenDoor, 'occurred_at' => Time::fromIso('2026-11-03T19:30:00.000Z')]);
+    // A small file whose header says 20 000 × 20 000: GD would unpack it to some 1.6 GB.
+    $small = realJpegBytes(16, 16);
+    $bytes = substr_replace($small, pack('nn', 20_000, 20_000), (int) strpos($small, "\xFF\xC0") + 5, 4);
+    expect(getimagesizefromstring($bytes))->toMatchArray([0 => 20_000, 1 => 20_000]);
+    Storage::disk('local')->put('waypost/media/huge.jpg', $bytes);
+    $media = Media::factory()->create(['owner_type' => Incident::class, 'owner_id' => $incident->id, 'device_id' => $phone->id, 'sha256' => hash('sha256', $bytes),
+        'mime' => 'image/jpeg', 'size_bytes' => strlen($bytes), 'path' => 'waypost/media/huge.jpg', 'taken_at' => Time::fromIso('2026-11-03T19:30:00.000Z'),
+        'uploaded_at' => Time::fromIso('2026-11-03T19:31:00.000Z')]);
+
+    expect(Thumbnails::dataUri($media))->toBeNull();
+    sendDueReports('2026-11-09T09:00:00Z');
+
+    expect(Report::query()->sole()->sent_at)->not->toBeNull()
+        ->and((string) sentPeriodMails()[0]->pdf)->toStartWith('%PDF-')
+        ->and(str_contains((string) sentPeriodMails()[0]->pdf, '/Subtype /Image'))->toBeFalse();
+});
+
+it('sends a report again once the claim of an attempt that died is abandoned, without the PDF it left', function (): void {
+    $fixture = periodReportSite(ReportFrequency::Weekly);
+    $log = Log::spy();
+    travelTo(CarbonImmutable::parse('2026-11-09T09:00:00Z'));
+    // As if the first attempt had claimed the report and stored its PDF, and its worker was killed while sending.
+    $claim = Report::factory()->create(['site_id' => $fixture['site']->id, 'type' => ReportFrequency::Weekly, 'path' => 'waypost/reports/left.pdf',
+        'period_start' => Time::fromIso('2026-11-01T23:00:00.000Z'), 'period_end' => Time::fromIso('2026-11-08T23:00:00.000Z')]);
+    Storage::disk('local')->put('waypost/reports/left.pdf', '%PDF-');
+
+    sendDueReports('2026-11-09T09:14:59.999Z');
+    expect(sentPeriodMails())->toBe([]);
+    $log->shouldNotHaveReceived('warning');
+
+    sendDueReports('2026-11-09T09:15:00Z');
+
+    expect(sentPeriodMails())->toHaveCount(1);
+    $report = Report::query()->sole();
+    expect($report->id)->not->toBe($claim->id)
+        ->and($report->sent_at)->not->toBeNull()
+        ->and(Storage::disk('local')->exists('waypost/reports/left.pdf'))->toBeFalse()
+        ->and(Storage::disk('local')->exists((string) $report->path))->toBeTrue();
+    $log->shouldHaveReceived('warning')->once();
 });
 
 it('sends the monthly report on the 1st for the calendar month before, with its PDF', function (): void {

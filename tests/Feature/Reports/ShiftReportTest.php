@@ -284,3 +284,29 @@ it('sends no shift report without a subscriber, nor for a shift still open', fun
 
     expect(sentReportMails())->toBe([]);
 });
+
+it('sends the report again once the claim of an attempt that died is abandoned', function (): void {
+    delayingQueue();
+    $fixture = shiftReportSite();
+    $shift = shiftEntries($fixture, User::factory()->create(), '18:55:00', '21:40:00');
+    travelTo(CarbonImmutable::parse('2026-11-03T21:41:00Z'));
+    pushAs($fixture['phone'], $shift['entries'])->assertOk();
+    // As if the first attempt had claimed the report, and its worker was killed while sending.
+    $claim = Report::factory()->create(['site_id' => $fixture['site']->id, 'type' => ReportFrequency::Shift,
+        'period_start' => Time::fromIso('2026-11-03T18:55:00.000Z'), 'period_end' => Time::fromIso('2026-11-03T21:40:00.000Z')]);
+
+    // The queue's retry waits until the claim is abandoned.
+    travelTo(CarbonImmutable::parse('2026-11-03T21:42:30Z'));
+    $retry = (new SendShiftReport($shift['shift_id'], Time::iso(Time::now())))->withFakeQueueInteractions();
+    app()->call([$retry, 'handle']);
+    $retry->assertReleased(15 * 60 - 90 + 1);
+    expect(sentReportMails())->toBe([]);
+
+    travelTo(CarbonImmutable::parse('2026-11-03T21:56:00Z'));
+    app()->call([new SendShiftReport($shift['shift_id'], Time::iso(Time::now())), 'handle']);
+
+    expect(sentReportMails())->toHaveCount(1);
+    $report = Report::query()->sole();
+    expect($report->id)->not->toBe($claim->id)
+        ->and($report->sent_at)->not->toBeNull();
+});

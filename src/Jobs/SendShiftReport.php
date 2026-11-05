@@ -55,7 +55,16 @@ final class SendShiftReport implements ShouldQueue
     {
         $shift = Shift::query()->find($this->shiftId);
         $site = $shift === null ? null : Site::query()->find($shift->site_id);
-        if ($shift === null || $site === null || ReportSender::exists($site, ReportFrequency::Shift, $shift->started_at->toImmutable())) {
+        if ($shift === null || $site === null) {
+            return;
+        }
+        if (ReportSender::exists($site, ReportFrequency::Shift, $shift->started_at->toImmutable())) {
+            // Being sent: by another job, or by this one's attempt that died; then retry once it is abandoned.
+            $pending = ReportSender::pendingFor($site, ReportFrequency::Shift, $shift->started_at->toImmutable());
+            if ($pending !== null) {
+                $this->release($pending);
+            }
+
             return;
         }
         $device = Device::withTrashed()->find($shift->device_id);

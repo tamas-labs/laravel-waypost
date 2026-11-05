@@ -3,7 +3,7 @@
 - **Audit dátuma:** 2026-11-04
 - **Vizsgált állapot:** `main`, `4fc8a6c` (Release 0.2.0), munkakönyvtár módosítás nélkül (csak a `docs/audit.20261104.md` nem követett)
 - **Szempontok:** `docs/audit.20261104.md`
-- **Kapcsolódó dokumentumok:** [AUDIT-REPORT.md](AUDIT-REPORT.md), [AUDIT-COMPLIANCE.md](AUDIT-COMPLIANCE.md)
+- **Kapcsolódó dokumentumok:** [AUDIT-REPORT.md](AUDIT-REPORT.md), [AUDIT-COMPLIANCE.md](AUDIT-COMPLIANCE.md); más repók teendői: [AUDIT-OTHER-REPOS.md](AUDIT-OTHER-REPOS.md)
 
 A sorszámok a vizsgált commit fájljaira vonatkoznak. A „Bizonyosság” azt mutatja, mennyire biztos maga a hiba és a leírt következmény: **magas** = a kódból közvetlenül igazolható; **közepes** = a hiba igazolt, de a következmény mértéke vagy valószínűsége a környezettől függ; **alacsony** = valószínű, de nem igazolt.
 
@@ -48,7 +48,7 @@ Nincs ilyen megállapítás.
   - vagy egyszerűbben: `acting` hívó ne módosíthasson `email` / `password` mezőt és PIN-t (403), saját magának sem;
   - a sémaleírásban rögzíteni (előbb a `waypost-schema`-ban), majd teszt az `EndpointsTest` / `UsersTest` mátrixba.
 - **Bizonyosság:** magas (a kódút igazolt: policy → controller → `$user->update($input)`; nincs olyan teszt, amely ezt az esetet tiltaná).
-- **Állapot:** javítva (2026-11-05): `acting` hívónál a `UserPolicy::update()` a saját rekordra is a `manage()` ágat követi; tesztek: `PoliciesTest`, `UsersTest`; döntés: `docs/decisions.md` (Konfigurációs CRUD: közös szabályok). A sémaleírás pontosítása (`waypost-schema`) még nyitott.
+- **Állapot:** javítva (2026-11-05): `acting` hívónál a `UserPolicy::update()` a saját rekordra is a `manage()` ágat követi; tesztek: `PoliciesTest`, `UsersTest`; döntés: `docs/decisions.md` (Konfigurációs CRUD: közös szabályok). A sémaleírás pontosítása (`waypost-schema`) még nyitott: [AUDIT-OTHER-REPOS.md](AUDIT-OTHER-REPOS.md) 1.
 
 ---
 
@@ -116,6 +116,11 @@ Nincs ilyen megállapítás.
   - `getimagesizefromstring()` a feltöltéskor (felső határ, pl. 4096 × 4096, az app 1600 px-et küld) és a bélyegkép előtt is;
   - a foglalt, de el nem küldött sor egy határidő után legyen újrapróbálható (pl. `generated_at` + N perc és `sent_at = null`), vagy kerüljön riasztásba vagy naplóba.
 - **Bizonyosság:** magas a mechanizmusra (a GD kibontási viselkedése és a foglalás logikája ismert); közepes a gyakorlati valószínűségre.
+- **Állapot:** javítva (2026-11-05):
+  - a `Thumbnails` a fejléc szerint 4096 × 3072 képpontnál nagyobb fotót nem bont ki, a PDF bélyegkép nélkül készül el;
+  - a 15 percnél régebbi, el nem küldött foglalás elhagyottnak számít: a következő próbálkozás törli (a PDF-jével együtt), `Log::warning`-ot ír, és újra küld; a műszakjelentés jobja addig `release()`-szel vár;
+  - a feltöltéskori méretkorlát (422) API-szerződésváltozás, ezért nem itt készült: lásd [AUDIT-OTHER-REPOS.md](AUDIT-OTHER-REPOS.md).
+  - Teszt: `PeriodReportTest`, `ShiftReportTest`; döntés: `docs/decisions.md` (A műszakjelentés / Egyszer; a periodikus jelentések / PDF).
 
 ### WP-BE-005 – A jelszócsere nem vonja vissza a supervisor meglévő tokenjeit, és a tokenek nem járnak le
 

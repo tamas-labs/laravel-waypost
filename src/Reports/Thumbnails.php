@@ -18,18 +18,34 @@ final class Thumbnails
 
     public const int QUALITY = 75;
 
+    /**
+     * The most pixels a photo may have to be scaled. GD unpacks an image to some 4–5 bytes a pixel whatever its file
+     * size, so a small JPEG with a 20 000 × 20 000 header would ask for gigabytes and kill the report's job, at
+     * every attempt. This keeps it near 60 MB, under a queue worker's usual 128M; the app sends 1600 px, a 12 MP
+     * camera image still fits.
+     */
+    public const int MAX_PIXELS = 4096 * 3072;
+
     private function __construct()
     {
     }
 
-    /** The uploaded photo's thumbnail, null if it is not on the disk (any more) or is not an image GD can read. */
+    /**
+     * The uploaded photo's thumbnail, null if it is not on the disk (any more), is not an image GD can read, or is
+     * larger than MAX_PIXELS (by its header, before anything is unpacked).
+     */
     public static function dataUri(Media $media): ?string
     {
         $disk = Storage::disk(config('waypost.storage.disk'));
         if ($media->path === null || !$disk->exists($media->path)) {
             return null;
         }
-        $image = @imagecreatefromstring((string) $disk->get($media->path));
+        $bytes = (string) $disk->get($media->path);
+        $size = @getimagesizefromstring($bytes);
+        if ($size === false || $size[0] * $size[1] > self::MAX_PIXELS) {
+            return null;
+        }
+        $image = @imagecreatefromstring($bytes);
         if ($image === false) {
             return null;
         }
