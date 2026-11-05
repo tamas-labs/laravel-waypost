@@ -618,6 +618,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül (a sémák nem írnak elő lapozást).
 - **Javítási irány:** A 2. lépcsőben, új végpontként vagy opcionális paraméterrel.
 - **Bizonyosság:** magas.
+- **Állapot:** dokumentálva (2026-11-05): a lépcső méretei mellett nem kell; a `waypost-schema` 0.7.0 óta a listák opcionális `next_cursor`-ja megvan, így a 2. lépcsőben szerződésváltozás nélkül bevezethető. Döntés: `docs/decisions.md` (Konfigurációs CRUD / A konfigurációs listák nem lapoznak). Kódváltozás nincs.
 
 ### WP-BE-037 – A 0.2.0 előtt a meglévő migrációk módosultak; ezentúl csak új migráció jöhet
 
