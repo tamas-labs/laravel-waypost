@@ -18,6 +18,7 @@ use Illuminate\Routing\Exceptions\BackedEnumCaseNotFoundException;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
+use Waypost\Chain\UnreadableDeviceSecret;
 use Waypost\Enums\ErrorCode;
 use Waypost\Http\Exceptions\ApiException;
 use Waypost\Support\Time;
@@ -77,6 +78,7 @@ final readonly class ErrorRenderer
             // A unique index caught a conflict the validation did not (e.g. a concurrent request).
             $e instanceof UniqueConstraintViolationException => self::response(ErrorCode::Conflict),
             $e instanceof HttpExceptionInterface => $this->httpError($e, $request),
+            $e instanceof UnreadableDeviceSecret => self::response(ErrorCode::ServerError, 'A szerver nem tudja ellenőrizni ennek a telefonnak a feltöltéseit. A telefont újra hozzá kell rendelni a telephelyhez.'),
             default => self::response(ErrorCode::ServerError),
         };
     }

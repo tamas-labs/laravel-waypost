@@ -6,12 +6,14 @@ namespace Waypost\Models;
 
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Waypost\Chain\UnreadableDeviceSecret;
 use Waypost\Database\Factories\DeviceFactory;
 use Waypost\Enums\Platform;
 use Waypost\Models\Concerns\HasWaypostTokens;
@@ -60,6 +62,21 @@ final class Device extends Model implements AuthenticatableContract
             'upload_closed_at' => 'datetime',
             'last_seq' => 'integer',
         ];
+    }
+
+    /**
+     * The HMAC secret of the chain (base64).
+     *
+     * @throws UnreadableDeviceSecret if the application key it was encrypted with is gone
+     */
+    public function hmacSecret(): string
+    {
+        try {
+            // The encrypted cast decrypts on read (PHPStan does not see that a property read may throw).
+            return (string) $this->getAttribute('secret');
+        } catch (DecryptException $e) {
+            throw new UnreadableDeviceSecret($this, $e);
+        }
     }
 
     /** @return BelongsTo<Site, $this> */

@@ -580,6 +580,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül (specifikáció: `secret (encrypted cast)`).
 - **Javítási irány:** A README-ben (WP-BE-028), és a visszafejtési hiba felismerhető hibakóddal jelenjen meg.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `Device::hmacSecret()` a visszafejtési hibát `UnreadableDeviceSecret`-té alakítja: a gazda naplójában az eszköz azonosítója és a teendő áll, a telefon `500 server_error`-t kap magyar üzenettel, és a push semmit nem tárol. A README *Üzemeltetés* fejezete (WP-BE-028) leírja a kulcscserét és ezt a hibát. Teszt: `SyncPushTest`; döntés: `docs/decisions.md` (A push feldolgozása / Visszafejthetetlen eszköztitok).
 
 ### WP-BE-034 – A polimorf tulajdonos teljes osztálynévként tárolódik
 

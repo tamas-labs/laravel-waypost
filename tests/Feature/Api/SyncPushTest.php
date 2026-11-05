@@ -2,17 +2,22 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Waypost\Chain\ChainProcessor;
 use Waypost\Chain\EntryHash;
+use Waypost\Chain\UnreadableDeviceSecret;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
 use Waypost\Models\Incident;
 use Waypost\Models\Media;
 use Waypost\Models\Shift;
+use Waypost\Support\Table;
 use Waypost\Support\Time;
 use Waypost\Support\Uuid;
 use Waypost\Tests\Fixtures\ChainBuilder;
@@ -63,6 +68,26 @@ it('accepts a good batch, keeps it and moves the head of the chain', function ()
         ->and($stored->content())->toEqualCanonicalizing($entries[1])
         ->and($stored->flags)->toBe([])
         ->and(Incident::query()->count())->toBe(2);
+});
+
+it('says so when the device secret cannot be decrypted', function (): void {
+    $device = Device::factory()->create();
+    [, $entries] = chainOf($device, 1);
+    // Encrypted with another application key, as after an APP_KEY change without APP_PREVIOUS_KEYS.
+    DB::table(Table::name('devices'))->where('id', $device->id)->update(['secret' => (new Encrypter(random_bytes(32), 'AES-256-CBC'))->encryptString('x')]);
+    $reported = [];
+    app(ExceptionHandler::class)->reportable(function (UnreadableDeviceSecret $e) use (&$reported): void {
+        $reported[] = $e->getMessage();
+    });
+
+    $response = pushAs($device, $entries)->assertInternalServerError();
+
+    expect($response)->toMatchSchema('api/error');
+    expect($response->json('error'))->toBe(['code' => 'server_error', 'message' => 'A szerver nem tudja ellenőrizni ennek a telefonnak a feltöltéseit. A telefont újra hozzá kell rendelni a telephelyhez.']);
+    expect($reported)->toHaveCount(1)
+        ->and($reported[0])->toContain($device->id, 'APP_PREVIOUS_KEYS');
+    expect(ChainEntry::query()->count())->toBe(0)
+        ->and($device->refresh()->last_seq)->toBe(0);
 });
 
 it('stores an entry so that its HMAC can be recomputed', function (): void {

@@ -85,7 +85,7 @@ final readonly class ChainProcessor
     /** @param  array<int, int>  $incoming  the seqs of the batch */
     private function receive(Device $device, ChainEntry $entry, array $incoming, PushResult $result): void
     {
-        if ($entry->seq > $device->last_seq + 1 && !EntryHash::matches($entry->content(), $device->secret)) {
+        if ($entry->seq > $device->last_seq + 1 && !EntryHash::matches($entry->content(), $device->hmacSecret())) {
             $result->reject($entry->id, ErrorCode::ChainGap, $device->last_seq + 1);
 
             return;
@@ -144,7 +144,7 @@ final readonly class ChainProcessor
         $stored = ChainEntry::query()->where('device_id', $device->id)->where('seq', $entry->seq)->first();
         if ($stored !== null) {
             $stored->hash === $entry->hash ? $result->accept($stored->id) : $result->reject($entry->id, ErrorCode::ChainFork);
-        } elseif (EntryHash::matches($entry->content(), $device->secret)) {
+        } elseif (EntryHash::matches($entry->content(), $device->hmacSecret())) {
             $result->accept($entry->id);
         } else {
             $result->reject($entry->id, ErrorCode::BadHmac);
@@ -156,7 +156,7 @@ final readonly class ChainProcessor
         return match (true) {
             $entry->seq !== $device->last_seq + 1 => VerifyStatus::Gap,
             $entry->prev_hash !== ($device->last_hash ?? EntryHash::GENESIS) => VerifyStatus::Fork,
-            !EntryHash::matches($entry->content(), $device->secret) => VerifyStatus::BadHmac,
+            !EntryHash::matches($entry->content(), $device->hmacSecret()) => VerifyStatus::BadHmac,
             default => VerifyStatus::Ok,
         };
     }

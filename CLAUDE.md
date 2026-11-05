@@ -34,7 +34,7 @@ src/
                         # SendNoDataAlerts (15 percenként, no_data_alerts), PruneExpiredData (naponta 03:30, adatmegőrzés)
   Schedule/             # Expansion (menetrend → várt körök, DST a Q5 szerint), Deadline (a kör határideje), TimeLimit (az időkeret alapértéke)
   Sync/                 # Pull (a pull egy lapja: láthatóság, deleted, reset), PullCursor
-  Chain/                # CanonicalJson, EntryHash (HMAC), ChainProcessor (a push), Projector (vetületek), ServerFlags, TrustedTime
+  Chain/                # CanonicalJson, EntryHash (HMAC), ChainProcessor (a push), Projector (vetületek), ServerFlags, TrustedTime, UnreadableDeviceSecret (az APP_KEY-csere után)
   Reports/              # Summarizer (ExpectedRounds: a várt időpontok, RoundRows: a körsorok) → Summary (egy időszak vagy műszak jelentésadata: RoundRow, RoundOutcome, IncompleteReason), Retention (megőrzési idő),
                         # ReportPeriod (mikor esedékes), ReportContent (a sablonok adata; Labels, LocalFormat, Palette), ReportSender (címzettek, egyszeri küldés, reports sor), Pdf (dompdf), Thumbnails (GD)
   Mail/                 # ReportMail (minden jelentés e-mailje, a heti/havi PDF-fel), NoDataAlertMail
