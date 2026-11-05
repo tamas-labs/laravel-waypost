@@ -510,6 +510,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Dokumentáció*; M7-01 (telepítési leírás).
 - **Javítási irány:** „Üzemeltetés” fejezet a README-ben az M7-01 részeként.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a README új *Üzemeltetés* fejezete. Tartalma: az `APP_KEY` cseréje (`APP_PREVIOUS_KEYS`); a mentés (adatbázis és lemez együtt, és az `APP_KEY`; a régebbi mentésből visszaállított lánc `chain_gap`-et jelez); a frissítés (`composer update`, `waypost:install --migrate`, `queue:restart`); a queue worker `--timeout`, `retry_after` és `--memory` beállítása a PDF-hez; a pontos szerveróra (NTP, `WAYPOST_PULL_SETTLE_MS`); a közös, zárolást támogató cache több szervernél; a `TrustProxies`; és az eszköztoken kockázata. Az M7-01 telepítési leírása erre építhet.
 
 ### WP-BE-029 – Nincs típuslefedettség-mérés, ahogy a skeletonban van
 
