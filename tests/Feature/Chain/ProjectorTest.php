@@ -222,7 +222,7 @@ it('projects an incident with the trusted time and its placeholder photos', func
         ->and($incident->accuracy_dm)->toBe(90)
         ->and($incident->chain_entry_id)->toBe($data['id']);
     $media = Media::query()->sole();
-    expect($media->owner_type)->toBe(Incident::class)
+    expect($media->owner_type)->toBe('waypost.incident')
         ->and($media->owner_id)->toBe($incident->id)
         ->and($media->sha256)->toBe($photo['sha256'])
         ->and($media->device_id)->toBe($device->id)

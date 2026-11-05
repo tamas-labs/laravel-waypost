@@ -6,6 +6,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Jobs\PruneExpiredData;
 use Waypost\Models\ChainEntry;
@@ -98,7 +99,7 @@ it('deletes the raw data older than 31 days, and keeps the configuration and the
     $site = $fixture['site'];
     ReportSubscription::factory()->create(['user_id' => supervisorOf($site)->id, 'site_id' => $site->id, 'frequency' => ReportFrequency::Weekly]);
     // A photo of a checkpoint is configuration.
-    $checkpointPhoto = Media::factory()->create(['owner_type' => Checkpoint::class, 'owner_id' => $fixture['points'][0]->id,
+    $checkpointPhoto = Media::factory()->create(['owner_type' => MediaOwnerType::Checkpoint->stored(), 'owner_id' => $fixture['points'][0]->id,
         'path' => 'waypost/media/checkpoint.jpg', 'taken_at' => CarbonImmutable::parse('2026-10-01T12:00:00Z'), 'uploaded_at' => CarbonImmutable::parse('2026-10-01T12:00:00Z')]);
     Storage::disk('local')->put('waypost/media/checkpoint.jpg', 'x');
 
@@ -155,7 +156,7 @@ it('deletes the photo of a checkpoint that never came after 31 days, and keeps t
     $deleted = Checkpoint::factory()->create();
     $deleted->delete();
     $uploaded = CarbonImmutable::parse('2026-10-01T12:00:00Z');
-    $photo = fn (string $checkpointId, string $name): Media => Media::factory()->create(['owner_type' => Checkpoint::class, 'owner_id' => $checkpointId,
+    $photo = fn (string $checkpointId, string $name): Media => Media::factory()->create(['owner_type' => MediaOwnerType::Checkpoint->stored(), 'owner_id' => $checkpointId,
         'path' => "waypost/media/{$name}.jpg", 'taken_at' => $uploaded, 'uploaded_at' => $uploaded]);
     $orphan = $photo(Uuid::v7(), 'orphan');
     $ofDeleted = $photo($deleted->id, 'deleted');

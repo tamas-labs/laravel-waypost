@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Http\SignedUrls;
 use Waypost\Models\Media;
@@ -44,7 +45,7 @@ function storedReport(Site $site, string $periodStart = '2026-10-25T23:00:00.000
 /** An uploaded photo of a scan, taken at the time. */
 function storedPhoto(string $takenAt): Media
 {
-    $media = Media::factory()->uploaded()->create(['owner_type' => Scan::class, 'owner_id' => Scan::factory(), 'taken_at' => Time::fromIso($takenAt)]);
+    $media = Media::factory()->uploaded()->create(['owner_type' => MediaOwnerType::Scan->stored(), 'owner_id' => Scan::factory(), 'taken_at' => Time::fromIso($takenAt)]);
     Storage::disk('local')->put((string) $media->path, jpegBytes($media->id));
 
     return $media;

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Waypost\Enums\ChainEntryType;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\IncidentCategory;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\RoundStatus;
 use Waypost\Enums\ShiftClosedBy;
 use Waypost\Enums\VerifyStatus;
@@ -263,7 +264,7 @@ it('lists the flagged scans, the bad chain entries and what is still to come', f
         ->and($summary->incompleteReasons)->toBe([]);
 
     // A photo not uploaded yet, and an entry that waits for configuration.
-    Media::factory()->create(['owner_type' => Scan::class, 'owner_id' => $outside->id, 'device_id' => $phone->id]);
+    Media::factory()->create(['owner_type' => MediaOwnerType::Scan->stored(), 'owner_id' => $outside->id, 'device_id' => $phone->id]);
     ChainEntry::factory()->create(['device_id' => $phone->id, 'type' => ChainEntryType::Scan, 'device_time' => Time::fromIso('2026-11-03T20:40:00.000Z'), 'projected_at' => null]);
 
     expect(summaryOf($fixture['site'], '2026-11-03', '2026-11-03', '2026-11-04T09:00:00.000Z')->incompleteReasons)

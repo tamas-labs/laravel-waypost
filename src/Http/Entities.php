@@ -185,7 +185,7 @@ final class Entities
         return [
             'id' => $media->id,
             'device_id' => $media->device_id,
-            'owner_type' => MediaOwnerType::ofModel($media->owner_type)->value,
+            'owner_type' => MediaOwnerType::ofStored($media->owner_type)->value,
             'owner_id' => $media->owner_id,
             'sha256' => $media->sha256,
             'mime' => $media->mime,

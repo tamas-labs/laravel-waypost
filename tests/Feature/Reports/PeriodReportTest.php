@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Waypost\Enums\IncidentCategory;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Enums\RoundStatus;
 use Waypost\Jobs\SendDueReports;
@@ -138,7 +139,7 @@ it('sends the weekly report on Monday with its PDF, the photos embedded, and sto
     $incident = Incident::factory()->create(['shift_id' => $shift->id, 'category' => IncidentCategory::OpenDoor, 'occurred_at' => Time::fromIso('2026-11-03T19:30:00.000Z')]);
     $bytes = realJpegBytes(1600, 1200);
     Storage::disk('local')->put('waypost/media/photo.jpg', $bytes);
-    Media::factory()->create(['owner_type' => Incident::class, 'owner_id' => $incident->id, 'device_id' => $phone->id, 'sha256' => hash('sha256', $bytes),
+    Media::factory()->create(['owner_type' => MediaOwnerType::Incident->stored(), 'owner_id' => $incident->id, 'device_id' => $phone->id, 'sha256' => hash('sha256', $bytes),
         'mime' => 'image/jpeg', 'size_bytes' => strlen($bytes), 'path' => 'waypost/media/photo.jpg', 'taken_at' => Time::fromIso('2026-11-03T19:30:00.000Z'),
         'uploaded_at' => Time::fromIso('2026-11-03T19:31:00.000Z')]);
 
@@ -182,7 +183,7 @@ it('sends the weekly report without the thumbnail of a photo too large to unpack
     $bytes = substr_replace($small, pack('nn', 20_000, 20_000), (int) strpos($small, "\xFF\xC0") + 5, 4);
     expect(getimagesizefromstring($bytes))->toMatchArray([0 => 20_000, 1 => 20_000]);
     Storage::disk('local')->put('waypost/media/huge.jpg', $bytes);
-    $media = Media::factory()->create(['owner_type' => Incident::class, 'owner_id' => $incident->id, 'device_id' => $phone->id, 'sha256' => hash('sha256', $bytes),
+    $media = Media::factory()->create(['owner_type' => MediaOwnerType::Incident->stored(), 'owner_id' => $incident->id, 'device_id' => $phone->id, 'sha256' => hash('sha256', $bytes),
         'mime' => 'image/jpeg', 'size_bytes' => strlen($bytes), 'path' => 'waypost/media/huge.jpg', 'taken_at' => Time::fromIso('2026-11-03T19:30:00.000Z'),
         'uploaded_at' => Time::fromIso('2026-11-03T19:31:00.000Z')]);
 

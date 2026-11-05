@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waypost\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Models\Incident;
 use Waypost\Models\Media;
 use Waypost\Support\Time;
@@ -22,7 +23,7 @@ final class MediaFactory extends Factory
     {
         return [
             'device_id' => null,
-            'owner_type' => Incident::class,
+            'owner_type' => MediaOwnerType::Incident->stored(),
             'owner_id' => Incident::factory(),
             'sha256' => bin2hex(random_bytes(32)),
             'taken_at' => Time::now(),

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Jobs\SendShiftReport;
 use Waypost\Mail\ReportMail;
@@ -194,7 +195,7 @@ it('counts the retention once per report, not once per photo link', function ():
     $phone = $fixture['phone'] ?? throw new LogicException('The site has its phone.');
     $shift = shiftOf($phone, '2026-10-01T18:55:00.000Z', '2026-10-01T21:40:00.000Z');
     $incident = Incident::factory()->create(['shift_id' => $shift->id, 'occurred_at' => Time::fromIso('2026-10-01T19:30:00.000Z')]);
-    Media::factory()->uploaded()->count(3)->create(['owner_type' => Incident::class, 'owner_id' => $incident->id, 'device_id' => $phone->id]);
+    Media::factory()->uploaded()->count(3)->create(['owner_type' => MediaOwnerType::Incident->stored(), 'owner_id' => $incident->id, 'device_id' => $phone->id]);
     $summary = app(Summarizer::class)->shift($shift);
     $subscriptionQueries = 0;
     $table = (new ReportSubscription())->getTable();

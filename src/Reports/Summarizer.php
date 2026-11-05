@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection as BaseCollection;
 use Waypost\Chain\TrustedTime;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
@@ -302,8 +303,8 @@ final class Summarizer
         $photosMissing = Media::query()
             ->whereNull('uploaded_at')
             ->where(fn (Builder $media) => $media
-                ->where(fn (Builder $ofScans) => $ofScans->where('owner_type', Scan::class)->whereIn('owner_id', $scans->map(fn (Scan $scan): string => $scan->id)->all()))
-                ->orWhere(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', Incident::class)->whereIn('owner_id', $incidents->modelKeys())))
+                ->where(fn (Builder $ofScans) => $ofScans->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scans->map(fn (Scan $scan): string => $scan->id)->all()))
+                ->orWhere(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', MediaOwnerType::Incident->stored())->whereIn('owner_id', $incidents->modelKeys())))
             ->exists();
         if ($photosMissing) {
             $reasons[] = IncompleteReason::MissingPhotos;

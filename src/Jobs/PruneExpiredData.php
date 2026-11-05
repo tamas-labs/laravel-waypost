@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
@@ -81,7 +82,7 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
     {
         $checkpoints = Table::name('checkpoints');
         $this->deleteMedia($disk, Media::query()
-            ->where('owner_type', Checkpoint::class)
+            ->where('owner_type', MediaOwnerType::Checkpoint->stored())
             ->where('uploaded_at', '<', $cutoff->utc()->format(Time::DATABASE_FORMAT))
             ->whereNotExists(fn (QueryBuilder $checkpoint) => $checkpoint->from($checkpoints)
                 ->whereColumn("{$checkpoints}.id", Table::name('media') . '.owner_id')));
@@ -105,8 +106,8 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
             $roundIds = self::ids(Round::query()->whereIn('shift_id', $shiftIds));
             $scanIds = self::ids(Scan::query()->whereIn('round_id', $roundIds));
             $this->deleteMedia($disk, Media::query()->where(fn (Builder $media) => $media
-                ->where(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', Incident::class)->whereIn('owner_id', $incidentIds))
-                ->orWhere(fn (Builder $ofScans) => $ofScans->where('owner_type', Scan::class)->whereIn('owner_id', $scanIds))));
+                ->where(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', MediaOwnerType::Incident->stored())->whereIn('owner_id', $incidentIds))
+                ->orWhere(fn (Builder $ofScans) => $ofScans->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scanIds))));
             self::deleteIn(Incident::query(), $incidentIds);
             // A scan of another shift's incident (a manual scan cited by it) stays with that incident.
             self::deleteIn(Scan::query()->whereNotExists(self::citingIncident()), $scanIds);
@@ -124,14 +125,14 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
                 ->whereIn("{$entries}.device_id", $deviceIds))
             ->whereNotExists(self::citingIncident());
         foreach (array_chunk(self::ids($loose), self::CHUNK) as $scanIds) {
-            $this->deleteMedia($disk, Media::query()->where('owner_type', Scan::class)->whereIn('owner_id', $scanIds));
+            $this->deleteMedia($disk, Media::query()->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scanIds));
             self::deleteIn(Scan::query(), $scanIds);
         }
 
         // Photos of scans and incidents taken before the cutoff (their links have expired), also never uploaded ones.
         $this->deleteMedia($disk, Media::query()
             ->whereIn('device_id', $deviceIds)
-            ->whereIn('owner_type', [Scan::class, Incident::class])
+            ->whereIn('owner_type', [MediaOwnerType::Scan->stored(), MediaOwnerType::Incident->stored()])
             ->where('taken_at', '<', $before));
 
         // Chain entries no remaining projection refers to.

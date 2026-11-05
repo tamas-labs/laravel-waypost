@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\IncidentCategory;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Enums\ShiftClosedBy;
 use Waypost\Enums\VerifyStatus;
@@ -77,8 +78,8 @@ final class ReportContent
         ];
         $this->media = Media::query()
             ->where(fn (Builder $media) => $media
-                ->where(fn (Builder $ofScans) => $ofScans->where('owner_type', Scan::class)->whereIn('owner_id', $scanIds))
-                ->orWhere(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', Incident::class)
+                ->where(fn (Builder $ofScans) => $ofScans->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scanIds))
+                ->orWhere(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', MediaOwnerType::Incident->stored())
                     ->whereIn('owner_id', array_map(fn (Incident $incident): string => $incident->id, $summary->incidents))))
             ->orderBy('taken_at')
             ->orderBy('id')
@@ -295,8 +296,8 @@ final class ReportContent
     /** @return array<string, mixed> */
     private function incident(Incident $incident): array
     {
-        $photos = $this->media->filter(fn (Media $media): bool => ($media->owner_type === Incident::class && $media->owner_id === $incident->id)
-            || ($incident->scan_id !== null && $media->owner_type === Scan::class && $media->owner_id === $incident->scan_id));
+        $photos = $this->media->filter(fn (Media $media): bool => ($media->owner_type === MediaOwnerType::Incident->stored() && $media->owner_id === $incident->id)
+            || ($incident->scan_id !== null && $media->owner_type === MediaOwnerType::Scan->stored() && $media->owner_id === $incident->scan_id));
         $links = [];
         foreach ($photos as $photo) {
             $url = $this->embed === null ? SignedUrls::photo($photo, $this->summary->site, $this->retentionDays) : ($this->embed)($photo);

@@ -33,6 +33,7 @@ use Waypost\Jobs\SendDueReports;
 use Waypost\Jobs\SendNoDataAlerts;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
+use Waypost\Models\MorphMap;
 use Waypost\Models\ReportSubscription;
 use Waypost\Models\Route;
 use Waypost\Models\Schedule as RoundSchedule;
@@ -71,6 +72,9 @@ final class WaypostServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(self::CONFIG_FILE, 'waypost');
+
+        // Before any model is used: the polymorphic columns store these aliases.
+        MorphMap::register();
 
         // The guard of the package's tokens; Sanctum's "sanctum" guard reads the host application's token table.
         // Never in the place of a guard of the host (config:cache keeps the package's own, with its driver).

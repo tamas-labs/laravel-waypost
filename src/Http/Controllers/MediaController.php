@@ -141,7 +141,7 @@ final class MediaController extends Controller
         return new Media([
             'id' => $id,
             'device_id' => $caller->device?->id,
-            'owner_type' => Checkpoint::class,
+            'owner_type' => MediaOwnerType::Checkpoint->stored(),
             'owner_id' => $checkpointId,
             'sha256' => $sha256,
         ]);
@@ -149,7 +149,7 @@ final class MediaController extends Controller
 
     private static function assertOwner(Media $photo, MediaOwnerType $owner, string $ownerId): void
     {
-        if ($photo->owner_type !== $owner->model() || $photo->owner_id !== $ownerId) {
+        if ($photo->owner_type !== $owner->stored() || $photo->owner_id !== $ownerId) {
             self::invalid('owner_id', 'A fotó nem ehhez tartozik.');
         }
     }

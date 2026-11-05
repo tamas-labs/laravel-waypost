@@ -5,11 +5,11 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\Incident;
 use Waypost\Models\Media;
-use Waypost\Models\Scan;
 use Waypost\Models\Site;
 use Waypost\Support\Time;
 use Waypost\Support\Uuid;
@@ -59,7 +59,7 @@ it('lists a cited photo as missing with its placeholder row, until it is uploade
 
     $photo = Media::query()->whereKey($id)->firstOrFail();
     expect($photo->device_id)->toBe($device->id)
-        ->and($photo->owner_type)->toBe(Incident::class)
+        ->and($photo->owner_type)->toBe('waypost.incident')
         ->and($photo->owner_id)->toBe($incidentId)
         ->and($photo->sha256)->toBe(hash('sha256', $bytes))
         ->and($photo->path)->toBeNull()
@@ -130,7 +130,7 @@ it('gives the photo of a manual entry to its scan, and its incident cites the sa
 
     expect($response->json('media_missing'))->toBe([$photo['id']]);
     $row = Media::query()->sole();
-    expect($row->owner_type)->toBe(Scan::class)->and($row->owner_id)->toBe($scan['payload']['scan_id']);
+    expect($row->owner_type)->toBe('waypost.scan')->and($row->owner_id)->toBe($scan['payload']['scan_id']);
 });
 
 it('refuses a file whose hash differs from the one it tells, or from the entry\'s', function (): void {
@@ -287,8 +287,8 @@ it('refuses a photo_media_id that is missing, not uploaded, or of another checkp
     $site = Site::factory()->create();
     $supervisor = supervisorOf($site);
     $checkpoint = Checkpoint::factory()->for($site)->create();
-    $notUploaded = Media::factory()->create(['owner_type' => Checkpoint::class, 'owner_id' => $checkpoint->id]);
-    $ofAnother = Media::factory()->uploaded()->create(['owner_type' => Checkpoint::class, 'owner_id' => Uuid::v7()]);
+    $notUploaded = Media::factory()->create(['owner_type' => MediaOwnerType::Checkpoint->stored(), 'owner_id' => $checkpoint->id]);
+    $ofAnother = Media::factory()->uploaded()->create(['owner_type' => MediaOwnerType::Checkpoint->stored(), 'owner_id' => Uuid::v7()]);
     $ofIncident = Media::factory()->uploaded()->create(['owner_id' => $checkpoint->id]);
 
     foreach ([Uuid::v7(), $notUploaded->id, $ofAnother->id, $ofIncident->id] as $id) {
@@ -302,7 +302,7 @@ it('sets and removes the photo of a checkpoint', function (): void {
     $site = Site::factory()->create();
     $supervisor = supervisorOf($site);
     $checkpoint = Checkpoint::factory()->for($site)->create();
-    $photo = Media::factory()->uploaded()->create(['owner_type' => Checkpoint::class, 'owner_id' => $checkpoint->id]);
+    $photo = Media::factory()->uploaded()->create(['owner_type' => MediaOwnerType::Checkpoint->stored(), 'owner_id' => $checkpoint->id]);
 
     callApi('PATCH', "checkpoints/{$checkpoint->id}", $supervisor, ['photo_media_id' => $photo->id])->assertOk()->assertJsonPath('checkpoint.photo_media_id', $photo->id);
     // Renaming does not check the photo again.

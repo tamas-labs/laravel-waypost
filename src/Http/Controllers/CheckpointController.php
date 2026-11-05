@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Waypost\Auth\Caller;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\TagType;
 use Waypost\Http\Entities;
 use Waypost\Http\Exceptions\ApiException;
@@ -127,7 +128,7 @@ final class CheckpointController extends Controller
     {
         return Media::query()
             ->whereKey($checkpoint->photo_media_id)
-            ->where('owner_type', Checkpoint::class)
+            ->where('owner_type', MediaOwnerType::Checkpoint->stored())
             ->where('owner_id', $checkpoint->id)
             ->whereNotNull('uploaded_at')
             ->exists();

@@ -8,6 +8,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Waypost\Enums\ChainEntryType;
 use Waypost\Enums\ChainFlag;
+use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\RoundStatus;
 use Waypost\Jobs\SendShiftReport;
 use Waypost\Models\ChainEntry;
@@ -63,8 +64,8 @@ final class Projector
     private function recordMedia(Device $device, ChainEntry $entry): void
     {
         [$owner, $ownerKey] = match ($entry->type) {
-            ChainEntryType::Scan => [Scan::class, 'scan_id'],
-            ChainEntryType::Incident => [Incident::class, 'incident_id'],
+            ChainEntryType::Scan => [MediaOwnerType::Scan->stored(), 'scan_id'],
+            ChainEntryType::Incident => [MediaOwnerType::Incident->stored(), 'incident_id'],
             default => [null, null],
         };
         if ($owner === null) {

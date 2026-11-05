@@ -592,6 +592,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül.
 - **Javítási irány:** A csomag saját morph aliasait a `Relation::morphMap()`-pel regisztrálni (nem `enforce`), és a README-ben jelezni.
 - **Bizonyosság:** közepes (a gazda `enforceMorphMap()` esetét nem próbáltam ki).
+- **Állapot:** javítva (2026-11-05): a `Waypost\Models\MorphMap` minden modellnek `waypost.` előtagú aliast ad, és a `Relation::morphMap()`-be teszi (nem `enforce`). Új migráció (`2026_11_05_000020_use_waypost_morph_aliases.php`) írja át a tárolt osztályneveket a három polimorf oszlopban. Kiderült, hogy enélkül egy `enforceMorphMap()`-et használó gazdában a csomag nem működik (`ClassMorphViolationException` már az első tokennél). README *Üzemeltetés*, CLAUDE.md-szabály. Teszt: `MorphMapTest`; döntés: `docs/decisions.md` (A fotó feltöltése és a push-final / `owner_type`).
 
 ### WP-BE-035 – Nincs naplózás és megfigyelhetőség a kritikus eseményekre
 

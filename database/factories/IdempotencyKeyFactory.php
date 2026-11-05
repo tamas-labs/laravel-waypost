@@ -6,6 +6,7 @@ namespace Waypost\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Waypost\Models\IdempotencyKey;
+use Waypost\Models\MorphMap;
 use Waypost\Models\User;
 use Waypost\Support\Time;
 use Waypost\Support\Uuid;
@@ -20,7 +21,7 @@ final class IdempotencyKeyFactory extends Factory
         $body = '{"name":"Telephely A"}';
 
         return [
-            'owner_type' => User::class,
+            'owner_type' => MorphMap::alias(User::class),
             'owner_id' => User::factory()->supervisor(),
             'key' => Uuid::v7(),
             'method' => 'POST',
