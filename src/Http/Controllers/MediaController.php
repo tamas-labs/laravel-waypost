@@ -115,13 +115,16 @@ final class MediaController extends Controller
         return $photo;
     }
 
-    /** A supervisor's, on a checkpoint they manage if it exists already. */
+    /**
+     * A supervisor's, on a checkpoint they manage if it exists already, also a deleted one: otherwise anybody could put
+     * a photo on the deleted checkpoint of another site.
+     */
     private function checkpointPhoto(string $id, string $checkpointId, string $sha256, Caller $caller): Media
     {
         if (!$caller->isSupervisor()) {
             throw ApiException::forbidden('A pont fotóját csak supervisor töltheti fel.');
         }
-        $checkpoint = Checkpoint::query()->find($checkpointId);
+        $checkpoint = Checkpoint::withTrashed()->find($checkpointId);
         if ($checkpoint !== null) {
             $this->gate->authorize('update', $checkpoint);
         }

@@ -13,6 +13,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
 use Waypost\Models\ChainEntry;
+use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
 use Waypost\Models\DeviceDiagnostic;
 use Waypost\Models\Incident;
@@ -64,6 +65,22 @@ final class PruneExpiredData implements ShouldQueue
         }
         // A phone with no site any more: the shortest retention.
         $this->prune($disk, self::ids(Device::withTrashed()->whereNull('site_id')), $now->subDays(Retention::MIN_DAYS));
+        $this->pruneOrphanCheckpointPhotos($disk, $now->subDays(Retention::MIN_DAYS));
+    }
+
+    /**
+     * Photos of a checkpoint that never came: the upload goes before the checkpoint request (offline training), and that
+     * request may never arrive. Kept for the shortest retention, as there is no site to take it from; the photo of a
+     * deleted checkpoint stays, with the checkpoint.
+     */
+    private function pruneOrphanCheckpointPhotos(Filesystem $disk, CarbonImmutable $cutoff): void
+    {
+        $checkpoints = Table::name('checkpoints');
+        $this->deleteMedia($disk, Media::query()
+            ->where('owner_type', Checkpoint::class)
+            ->where('uploaded_at', '<', $cutoff->utc()->format(Time::DATABASE_FORMAT))
+            ->whereNotExists(fn (QueryBuilder $checkpoint) => $checkpoint->from($checkpoints)
+                ->whereColumn("{$checkpoints}.id", Table::name('media') . '.owner_id')));
     }
 
     /** @param  list<string>  $deviceIds */

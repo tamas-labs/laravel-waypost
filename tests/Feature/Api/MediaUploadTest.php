@@ -258,14 +258,17 @@ it('takes the photo of a checkpoint from the site phone with X-Acting-User, but 
     expect($response->json('media.device_id'))->toBe($phone->id);
 });
 
-it('hides a checkpoint of another site', function (): void {
+it('hides a checkpoint of another site, also a deleted one', function (bool $deleted): void {
     $checkpoint = Checkpoint::factory()->create();
+    if ($deleted) {
+        $checkpoint->delete();
+    }
     $bytes = jpegBytes();
 
     uploadMedia(Uuid::v7(), photoFields('checkpoint', $checkpoint->id, $bytes), ['Authorization' => 'Bearer ' . supervisorToken(supervisorOf(Site::factory()->create()))], $bytes)
         ->assertNotFound();
     expect(Media::query()->count())->toBe(0);
-});
+})->with(['existing' => [false], 'deleted' => [true]]);
 
 it('takes the same checkpoint photo again, and no other file under its ID', function (): void {
     $site = Site::factory()->create();

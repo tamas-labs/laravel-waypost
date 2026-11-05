@@ -321,6 +321,7 @@ Nincs ilyen megállapítás.
   - árva pontfotók takarítása (pl. N nap után, ha nincs ilyen pont);
   - a `Checkpoint::withTrashed()` használata a jogosultság-ellenőrzésnél.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `PruneExpiredData` a feltöltés után 31 nappal (`Retention::MIN_DAYS`) törli a pont fotóját a fájllal együtt, ha a pont nem létezik; a törölt pont fotója marad. A feltöltésnél a jogosultság a törölt pontra is a pont telephelye szerint dől el (`Checkpoint::withTrashed()`). Teszt: `PruneExpiredDataTest`, `MediaUploadTest`; döntés: `docs/decisions.md` (Az adatmegőrzés).
 
 ### WP-BE-016 – A fotó letöltésénél hiányzik az `X-Content-Type-Options: nosniff`
 

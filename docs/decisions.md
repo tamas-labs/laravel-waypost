@@ -474,11 +474,12 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
     - a `device_diagnostics` a `received_at` szerint;
     - a `no_data_alerts` a határidő szerint;
     - a tárolt PDF a `reports.period_end` szerint: a fájl törlődik, a sor marad `path = null`-lal, így az archívum mutatja, hogy a jelentés kiment, de már nem tölthető le.
+    - a soha meg nem érkezett pont fotója (2026-11-05, WP-BE-015) a feltöltés után 31 nappal. A feltöltés a pont létrehozása előtt jön (offline betanítás), és a pont kérése elmaradhat. Telephely nincs hozzá, ezért a legrövidebb megőrzés. A törölt pont fotója a ponttal együtt marad. A feltöltés jogosultsága a törölt pontnál is a pont telephelye szerint dől el (`Checkpoint::withTrashed()`), így más telephely törölt pontjára senki nem tölthet fel.
   - Egy eseményben hivatkozott leolvasás az eseménnyel együtt törlődik.
   - A törlés 500-as darabokban megy.
   - **Megmarad:** a konfiguráció (pontok és fotóik, útvonalverziók, menetrendek, felhasználók), és a `devices.last_seq` és `last_hash`. A lánc ezekről folytatódik, és a telefon által újraküldött, már törölt bejegyzést a `ChainProcessor` a HMAC-ja alapján ismeri fel.
 - **Indok:** A specifikáció *Adatmegőrzés* pontja szerint. A műszak az egység, mert a jelentések műszakonként olvassák az adatot. A láncbejegyzés csak az utolsó hivatkozó vetülettel mehet, különben egy megmaradt kör forrása nem lenne ellenőrizhető.
-- **Érintett:** `src/Jobs/PruneExpiredData.php`, `src/WaypostServiceProvider.php`, `tests/Feature/Reports/PruneExpiredDataTest.php`, M6-11.
+- **Érintett:** `src/Jobs/PruneExpiredData.php`, `src/WaypostServiceProvider.php`, `src/Http/Controllers/MediaController.php`, `tests/Feature/Reports/PruneExpiredDataTest.php`, M6-11.
 
 ## 2026-11-04 – A jelentések átnézése és a PDF memóriaigénye (M6-12)
 

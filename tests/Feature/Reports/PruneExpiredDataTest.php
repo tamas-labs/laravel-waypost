@@ -151,6 +151,27 @@ it('deletes the raw data older than 31 days, and keeps the configuration and the
         ->and($response->json('rejected'))->toBe([]);
 });
 
+it('deletes the photo of a checkpoint that never came after 31 days, and keeps that of a deleted one', function (): void {
+    $deleted = Checkpoint::factory()->create();
+    $deleted->delete();
+    $uploaded = CarbonImmutable::parse('2026-10-01T12:00:00Z');
+    $photo = fn (string $checkpointId, string $name): Media => Media::factory()->create(['owner_type' => Checkpoint::class, 'owner_id' => $checkpointId,
+        'path' => "waypost/media/{$name}.jpg", 'taken_at' => $uploaded, 'uploaded_at' => $uploaded]);
+    $orphan = $photo(Uuid::v7(), 'orphan');
+    $ofDeleted = $photo($deleted->id, 'deleted');
+    Storage::disk('local')->put('waypost/media/orphan.jpg', 'x');
+    Storage::disk('local')->put('waypost/media/deleted.jpg', 'x');
+
+    pruneExpiredData('2026-11-01T11:59:59Z');
+    expect(Media::query()->whereKey($orphan->id)->exists())->toBeTrue();
+
+    pruneExpiredData('2026-11-01T12:00:01Z');
+    expect(Media::query()->whereKey($orphan->id)->exists())->toBeFalse()
+        ->and(Storage::disk('local')->exists('waypost/media/orphan.jpg'))->toBeFalse()
+        ->and(Media::query()->whereKey($ofDeleted->id)->exists())->toBeTrue()
+        ->and(Storage::disk('local')->exists('waypost/media/deleted.jpg'))->toBeTrue();
+});
+
 it('keeps 62 days for a site with a monthly report', function (): void {
     $fixture = patrolledSite(['weekdays' => 127, 'start_times' => ['20:00'], 'time_limit_min' => 30]);
     $phone = $fixture['phone'] ?? throw new LogicException('The site has its phone.');
