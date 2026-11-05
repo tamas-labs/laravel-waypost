@@ -191,6 +191,7 @@ Nincs ilyen megállapítás.
   - kiadás előtt az install-smoke;
   - a `waypost-schema` path repository miatt a sémarepó checkoutja vagy egy verziózott Composer-forrás.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05). A CI-t a `bb7d4d8` vezette be (MySQL, `analyse`, `lint`, a séma a rögzített tagen). Most ehhez jött a PostgreSQL 16, a `--prefer-lowest` függőségek és az install-smoke külön jobban. Az install-smoke a beégetett `0.5.0` sémaverzió miatt nem települt volna, ez is javítva. A Windows- és a több PHP/Laravel-verziós mátrix nem kell (`php: ^8.4`, `laravel/framework: ^13.0`). Döntés: `docs/decisions.md` (CI … index minden idegen kulcson).
 
 ---
 

@@ -8,6 +8,8 @@ set -eu
 
 package_dir=$(cd "$(dirname "$0")/.." && pwd)
 schema_dir=$(cd "$package_dir/../waypost-schema" && pwd)
+# The version the package requires (.waypost-schema-version), whatever the checkout next to it is at.
+schema_version=$(sed 's/^v//' "$package_dir/.waypost-schema-version")
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
 app="$work_dir/app"
@@ -20,7 +22,7 @@ composer create-project --no-interaction --quiet laravel/laravel "$app" '^13.0'
 cd "$app"
 
 step "composer require waypost/laravel-waypost (path repositories)"
-composer config repositories.waypost-schema "{\"type\": \"path\", \"url\": \"$schema_dir\", \"options\": {\"versions\": {\"waypost/schema\": \"0.5.0\"}}}"
+composer config repositories.waypost-schema "{\"type\": \"path\", \"url\": \"$schema_dir\", \"options\": {\"versions\": {\"waypost/schema\": \"$schema_version\"}}}"
 composer config repositories.laravel-waypost "{\"type\": \"path\", \"url\": \"$package_dir\", \"options\": {\"versions\": {\"waypost/laravel-waypost\": \"0.1.0\"}}}"
 composer require --no-interaction --quiet waypost/laravel-waypost:0.1.0
 

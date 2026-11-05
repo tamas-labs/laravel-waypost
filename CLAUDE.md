@@ -85,5 +85,5 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm --service-ports php composer serve` – build, majd a workbench a `http://localhost:8088` címen (`WAYPOST_PORT` felülírja; a 8000 a hoston foglalt).
 - `docker compose run --rm php vendor/bin/testbench <artisan parancs>` – artisan a workbench alkalmazásban.
 - `docker compose down` – leállítás; `down -v` a MySQL-adatokat is törli.
-- CI: `.github/workflows/ci.yml` – `main`-pushra és PR-re: a `waypost-schema` a `.waypost-schema-version` tagjén, `composer test` (MySQL 8.4), `analyse`, `lint`.
+- CI: `.github/workflows/ci.yml` – `main`-pushra és PR-re: a `waypost-schema` a `.waypost-schema-version` tagjén, `composer test` MySQL 8.4-en, PostgreSQL 16-on és a legalacsonyabb függőségekkel (`--prefer-lowest`), `analyse`, `lint`, és a `scripts/install-smoke.sh`.
 - Ha a hoston a 3306-os port foglalt (más projekt MySQL-je), `WAYPOST_MYSQL_PORT=3307 docker compose …`; a `-T` kapcsoló kell, ha nincs terminál (`docker compose run --rm -T php …`).
