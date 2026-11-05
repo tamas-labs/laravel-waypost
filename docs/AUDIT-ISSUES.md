@@ -556,6 +556,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül; tervezési kockázat.
 - **Javítási irány:** A dokumentációban rögzíteni. A telefon elvesztésekor az eszköz visszavonása mellett a telephely PIN-jeinek cseréje legyen az előírt eljárás.
 - **Bizonyosság:** magas.
+- **Állapot:** dokumentálva (2026-11-05): a README *Üzemeltetés* fejezete leírja a kockázatot, és előírja, hogy elveszett telefon után a hozzárendelés cseréje mellett a telephely PIN-jeit is újra kell osztani. Döntés: `docs/decisions.md` (Azonosítás / A PIN-ellenőrző a telefonon). Kódváltozás nincs (a specifikáció előírása).
 
 ### WP-BE-032 – A fotók aláírt linkje token nélkül, 31–62 napig érvényes (a specifikáció előírása)
 
