@@ -145,7 +145,7 @@ it('sends the shift report when the close is processed, to the subscribed superv
         ->and($content['chain']['ok'])->toBeTrue();
 
     $html = $mails[0]->render();
-    expect($html)->toContain('Waypost', 'Műszakjelentés', $site->name, 'Őr: Nagy Péter', 'Teljesítve', 'Elmaradt', 'Nyitott ajtó / ablak', 'Rendben.')
+    expect($html)->toContain('Waypost', 'Műszakjelentés', e($site->name), 'Őr: Nagy Péter', 'Teljesítve', 'Elmaradt', 'Nyitott ajtó / ablak', 'Rendben.')
         ->and(str_contains($html, 'Őrjárat'))->toBeFalse();
 
     // The same close again (a repeated push) sends nothing.
