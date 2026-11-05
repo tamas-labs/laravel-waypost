@@ -606,6 +606,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Biztonság (API9/API10)*, *Dokumentáció*. A specifikáció nem írja elő.
 - **Javítási irány:** Strukturált `Log::warning` / `info` a felsorolt helyeken, egy konfigurálható csatornán (`waypost.log_channel`).
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a csomag a `waypost.log_channel` (`WAYPOST_LOG_CHANNEL`, üresen a gazda alapértelmezettje) csatornán naplóz (`Waypost\Support\Logger`): a push elutasított bejegyzéseit hibakódonként (csak gapnél `info`, egyébként `warning`), a hivatkozásukra váró új bejegyzéseket, a még futó és a félbemaradt `Idempotency-Key`-t, az újraküldött jelentést és a takarítás összegzését. Teszt: `SyncPushTest`, `ProjectorTest`, `IdempotencyTest`, `PruneExpiredDataTest`, `PeriodReportTest`, `LoggerTest`; döntés: `docs/decisions.md` (Naplózás).
 
 ### WP-BE-036 – A konfigurációs listák nem lapoznak
 

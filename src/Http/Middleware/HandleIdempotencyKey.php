@@ -23,6 +23,7 @@ use Waypost\Http\Exceptions\ApiException;
 use Waypost\Models\Device;
 use Waypost\Models\IdempotencyKey;
 use Waypost\Models\User;
+use Waypost\Support\Logger;
 use Waypost\Support\Time;
 
 /**
@@ -67,14 +68,14 @@ final class HandleIdempotencyKey
                 $record = DB::transaction(fn (): IdempotencyKey => $this->create($owner, $key, $request, $fingerprint));
             } catch (UniqueConstraintViolationException) {
                 // The same key arrived concurrently.
-                $record = $this->find($owner, $key) ?? throw self::busy();
+                $record = $this->find($owner, $key) ?? throw self::busy($owner, $key);
             }
             if ($record->wasRecentlyCreated) {
                 return $this->run($request, $next, $record);
             }
         }
 
-        return $this->replay($record, $fingerprint);
+        return $this->replay($owner, $record, $fingerprint);
     }
 
     private function key(Request $request): string
@@ -120,6 +121,12 @@ final class HandleIdempotencyKey
         $record = IdempotencyKey::query()->whereMorphedTo('owner', $owner)->where('key', $key)->first();
         if ($record !== null && ($record->expires_at <= Time::now() || self::abandoned($record))) {
             // Expired or abandoned, but not cleaned up yet: as if it were new.
+            if (self::abandoned($record)) {
+                Logger::channel()->warning('Waypost: the request of an Idempotency-Key died without a response; it runs again.', [
+                    'owner_type' => $owner->getMorphClass(), 'owner_id' => $owner->getKey(), 'key' => $key, 'method' => $record->method,
+                    'path' => $record->path, 'created_at' => Time::iso($record->created_at ?? Time::now()),
+                ]);
+            }
             $record->delete();
 
             return null;
@@ -163,13 +170,13 @@ final class HandleIdempotencyKey
         return $response;
     }
 
-    private function replay(IdempotencyKey $record, string $fingerprint): Response
+    private function replay(User|Device $owner, IdempotencyKey $record, string $fingerprint): Response
     {
         if (!hash_equals($record->request_hash, $fingerprint)) {
             throw ValidationException::withMessages([self::HEADER => ['Ezt az Idempotency-Key-t már egy másik kéréshez használtad.']]);
         }
         if ($record->response_status === null || $record->response_body === null) {
-            throw self::busy();
+            throw self::busy($owner, $record->key);
         }
 
         return JsonResponse::fromJsonString($record->response_body, $record->response_status, [self::REPLAYED_HEADER => 'true']);
@@ -186,8 +193,12 @@ final class HandleIdempotencyKey
         return Time::now()->subSeconds(self::ABANDONED_AFTER_S);
     }
 
-    private static function busy(): ApiException
+    private static function busy(User|Device $owner, string $key): ApiException
     {
+        Logger::channel()->info('Waypost: a request came again while the first one with its Idempotency-Key still runs.', [
+            'owner_type' => $owner->getMorphClass(), 'owner_id' => $owner->getKey(), 'key' => $key,
+        ]);
+
         return new ApiException(
             ErrorCode::Conflict,
             'Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.',

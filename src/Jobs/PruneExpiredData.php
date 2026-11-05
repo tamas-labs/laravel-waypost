@@ -27,6 +27,7 @@ use Waypost\Models\Scan;
 use Waypost\Models\Shift;
 use Waypost\Models\Site;
 use Waypost\Reports\Retention;
+use Waypost\Support\Logger;
 use Waypost\Support\Table;
 use Waypost\Support\Time;
 
@@ -57,8 +58,13 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
         $this->onQueue(config('waypost.queue.queue'));
     }
 
+    /** @var array<string, int> the rows deleted by table, for the log */
+    private array $deleted = [];
+
     public function handle(): void
     {
+        $this->deleted = [];
+        $started = hrtime(true);
         $now = Time::now();
         $disk = Storage::disk(config('waypost.storage.disk'));
 
@@ -71,6 +77,10 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
         // A phone with no site any more: the shortest retention.
         $this->prune($disk, self::ids(Device::withTrashed()->whereNull('site_id')), $now->subDays(Retention::MIN_DAYS));
         $this->pruneOrphanCheckpointPhotos($disk, $now->subDays(Retention::MIN_DAYS));
+
+        Logger::channel()->info('Waypost: the expired data was pruned.', [
+            'deleted' => array_filter($this->deleted), 'duration_ms' => intdiv(hrtime(true) - $started, 1_000_000),
+        ]);
     }
 
     /**
@@ -108,11 +118,11 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
             $this->deleteMedia($disk, Media::query()->where(fn (Builder $media) => $media
                 ->where(fn (Builder $ofIncidents) => $ofIncidents->where('owner_type', MediaOwnerType::Incident->stored())->whereIn('owner_id', $incidentIds))
                 ->orWhere(fn (Builder $ofScans) => $ofScans->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scanIds))));
-            self::deleteIn(Incident::query(), $incidentIds);
+            $this->deleteIn(Incident::query(), $incidentIds);
             // A scan of another shift's incident (a manual scan cited by it) stays with that incident.
-            self::deleteIn(Scan::query()->whereNotExists(self::citingIncident()), $scanIds);
-            self::deleteIn(Round::query()->whereDoesntHave('scans'), $roundIds);
-            self::deleteIn(Shift::query()->whereDoesntHave('rounds')->whereDoesntHave('incidents'), $shiftIds);
+            $this->deleteIn(Scan::query()->whereNotExists(self::citingIncident()), $scanIds);
+            $this->deleteIn(Round::query()->whereDoesntHave('scans'), $roundIds);
+            $this->deleteIn(Shift::query()->whereDoesntHave('rounds')->whereDoesntHave('incidents'), $shiftIds);
         }
 
         // Scans outside a round before the cutoff.
@@ -126,7 +136,7 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
             ->whereNotExists(self::citingIncident());
         foreach (array_chunk(self::ids($loose), self::CHUNK) as $scanIds) {
             $this->deleteMedia($disk, Media::query()->where('owner_type', MediaOwnerType::Scan->stored())->whereIn('owner_id', $scanIds));
-            self::deleteIn(Scan::query(), $scanIds);
+            $this->deleteIn(Scan::query(), $scanIds);
         }
 
         // Photos of scans and incidents taken before the cutoff (their links have expired), also never uploaded ones.
@@ -145,10 +155,10 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
             ->whereNotExists($referenced('scans'))
             ->whereNotExists($referenced('incidents'));
         foreach (array_chunk(self::ids($old), self::CHUNK) as $entryIds) {
-            self::deleteIn(ChainEntry::query(), $entryIds);
+            $this->deleteIn(ChainEntry::query(), $entryIds);
         }
 
-        DeviceDiagnostic::query()->whereIn('device_id', $deviceIds)->where('received_at', '<', $before)->delete();
+        $this->count('device_diagnostics', DeviceDiagnostic::query()->whereIn('device_id', $deviceIds)->where('received_at', '<', $before)->delete());
     }
 
     /** The site's stored report PDFs and its alerts. */
@@ -163,8 +173,9 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
             ->each(function (Report $report) use ($disk): void {
                 $disk->delete((string) $report->path);
                 $report->fill(['path' => null])->save();
+                $this->count('report_files', 1);
             });
-        NoDataAlert::query()->where('site_id', $site->id)->where('deadline', '<', $before)->delete();
+        $this->count('no_data_alerts', NoDataAlert::query()->where('site_id', $site->id)->where('deadline', '<', $before)->delete());
     }
 
     /** @param  Builder<Media>  $media */
@@ -175,7 +186,13 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
                 $disk->delete($photo->path);
             }
             $photo->delete();
+            $this->count('media', 1);
         }
+    }
+
+    private function count(string $table, int $rows): void
+    {
+        $this->deleted[$table] = ($this->deleted[$table] ?? 0) + $rows;
     }
 
     /** An incident that cites the scan of the outer query. */
@@ -203,10 +220,10 @@ final class PruneExpiredData implements ShouldQueue, ShouldBeUnique
      * @param  Builder<TModel>  $query
      * @param  list<string>  $ids
      */
-    private static function deleteIn(Builder $query, array $ids): void
+    private function deleteIn(Builder $query, array $ids): void
     {
         if ($ids !== []) {
-            $query->whereKey($ids)->delete();
+            $this->count(substr($query->getModel()->getTable(), strlen(Table::prefix())), (int) $query->whereKey($ids)->delete());
         }
     }
 }

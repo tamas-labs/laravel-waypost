@@ -28,6 +28,12 @@ final class PushResult
         $this->rejected[] = ['id' => $id, 'code' => $code->value, 'expected_seq' => $expectedSeq];
     }
 
+    /** @return array<string, int> the number of rejected entries by error code */
+    public function rejectedCounts(): array
+    {
+        return array_count_values(array_column($this->rejected, 'code'));
+    }
+
     /**
      * The body of the response.
      *

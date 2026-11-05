@@ -16,7 +16,10 @@ use Waypost\Models\Scan;
 use Waypost\Models\Schedule;
 use Waypost\Models\Shift;
 use Waypost\Support\Time;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Mockery\MockInterface;
+use Psr\Log\LoggerInterface;
 use Illuminate\Support\Str;
 use Illuminate\Testing\PendingCommand;
 use Illuminate\Testing\TestResponse;
@@ -108,6 +111,21 @@ expect()->extend('toMatchSchema', function (string $name) {
 
     return $this;
 });
+
+/**
+ * A spy in the place of the package's log (Logger::channel(), on a channel of its own); the host's log is untouched.
+ *
+ * @return LoggerInterface&MockInterface
+ */
+function packageLog(): LoggerInterface
+{
+    /** @var LoggerInterface&MockInterface $log */
+    $log = Mockery::spy(LoggerInterface::class);
+    config()->set('waypost.log_channel', 'waypost-test');
+    Log::partialMock()->shouldReceive('channel')->with('waypost-test')->andReturn($log);
+
+    return $log;
+}
 
 /** The bearer token of a supervisor, as POST /auth/login issues it. */
 function supervisorToken(User $user): string

@@ -22,6 +22,7 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 ### Added
 
 - A csomag modelljei `waypost.` előtagú morph-aliasokat kapnak (`Relation::morphMap()`), így a csomag a morph mapjét kikényszerítő gazdában is működik; új migráció írja át a tárolt osztályneveket (`media.owner_type`, `idempotency_keys.owner_type`, `personal_access_tokens.tokenable_type`) (WP-BE-034).
+- Naplózás a `waypost.log_channel` (`WAYPOST_LOG_CHANNEL`) csatornán: elutasított láncbejegyzések, a hivatkozásukra váró bejegyzések, a még futó vagy félbemaradt `Idempotency-Key`, az újraküldött jelentés és az éjszakai takarítás összegzése (WP-BE-035).
 - `waypost.guard` (`WAYPOST_GUARD`): a csomag guardjának neve; ha a gazdának már van ilyen nevű, más guardja, az alkalmazás hibával áll le (WP-BE-027).
 - `waypost.pull.settle_ms` (`WAYPOST_PULL_SETTLE_MS`, 5000): a pull ennyi ideig nem küldi a friss változásokat (WP-BE-022).
 - `composer test:types`: típuslefedettség, 100% (WP-BE-029).

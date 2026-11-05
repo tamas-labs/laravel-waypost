@@ -120,7 +120,12 @@ it('deletes the raw data older than 31 days, and keeps the configuration and the
     expect(rawData($phone))->toBe(array_map(fn (int $count): int => 2 * $count, $patrol));
 
     // 31 days before 2026-12-12 12:00 UTC is 2026-11-11 12:00: the first patrol goes, the second stays.
+    $log = packageLog();
     pruneExpiredData('2026-12-12T12:00:00Z');
+
+    $log->shouldHaveReceived('info')->once()->withArgs(fn (string $message, array $context): bool => $message === 'Waypost: the expired data was pruned.'
+        && $context['deleted'] === ['media' => 1, 'incidents' => 1, 'scans' => 3, 'rounds' => 1, 'shifts' => 1, 'chain_entries' => 8, 'device_diagnostics' => 1, 'report_files' => 1, 'no_data_alerts' => 1]
+        && is_int($context['duration_ms']));
 
     expect(rawData($phone))->toBe($patrol)
         ->and(Shift::query()->whereKey($old['shift_id'])->exists())->toBeFalse()

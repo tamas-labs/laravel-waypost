@@ -6,7 +6,6 @@ use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Waypost\Chain\ChainProcessor;
 use Waypost\Chain\EntryHash;
@@ -145,8 +144,12 @@ it('replays the response of the same Idempotency-Key', function (): void {
 it('rejects an entry after a gap, stores it and keeps it out of the projections', function (): void {
     $device = Device::factory()->create();
     [, $entries] = chainOf($device, 4);
+    $log = packageLog();
 
     $response = pushAs($device, [$entries[0], $entries[3]])->assertOk();
+
+    // Only a gap: the phone's own retry, not worth a warning.
+    $log->shouldHaveReceived('log')->once()->with('info', 'Waypost: a push had rejected entries.', ['device_id' => $device->id, 'site_id' => $device->site_id, 'last_seq' => 1, 'rejected' => ['chain_gap' => 1]]);
 
     expect($response)->toMatchSchema('api/sync-push.response');
     expect($response->json())->toMatchArray([
@@ -186,7 +189,7 @@ it('fills a gap: 1, 2, 4, 5, then 3 makes all of them ok and the projection comp
 it('keeps a push whose entry cannot be applied, and applies that entry on a later push', function (): void {
     $device = Device::factory()->create();
     [$chain, $entries] = chainOf($device, 3);
-    $log = Log::spy();
+    $log = packageLog();
     $failed = false;
     Incident::creating(function () use (&$failed): void {
         if (!$failed) {
@@ -296,8 +299,11 @@ it('rejects a fork: the seq is right, the previous hash is not', function (): vo
     pushAs($device, $entries)->assertOk();
     $chain->lastHash = str_repeat('c', 64);
     $fork = $chain->incident($entries[0]['payload']['shift_id']);
+    $log = packageLog();
 
     $response = pushAs($device, [$fork])->assertOk();
+
+    $log->shouldHaveReceived('log')->once()->with('warning', 'Waypost: a push had rejected entries.', ['device_id' => $device->id, 'site_id' => $device->site_id, 'last_seq' => 1, 'rejected' => ['chain_fork' => 1]]);
 
     expect($response)->toMatchSchema('api/sync-push.response');
     expect($response->json())->toMatchArray([

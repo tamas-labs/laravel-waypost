@@ -527,7 +527,9 @@ it('runs the whole chain through a push, also what waited for an outbox request'
     $incident = $chain->incident($shift['payload']['shift_id']);
 
     // Trained offline: the checkpoint comes with the outbox, after the push.
+    $log = packageLog();
     $response = pushAs($device, [$shift, $scan, $incident])->assertOk();
+    $log->shouldHaveReceived('info')->once()->with('Waypost: accepted chain entries wait for what they refer to.', ['device_id' => $device->id, 'site_id' => $site->id, 'waiting' => 1]);
 
     expect($response->json())->toMatchArray(['accepted' => [$shift['id'], $scan['id'], $incident['id']], 'last_seq' => 3, 'rejected' => [], 'media_missing' => [$photo['id']]]);
     expect(Scan::query()->count())->toBe(0)

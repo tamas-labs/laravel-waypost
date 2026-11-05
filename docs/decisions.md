@@ -543,3 +543,17 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - A többi változás a sémaellenőrzésen át magától érvényes (kanonikus base64, a közös e-mail-minta, felső korlátok, `request-error-code`); a push `media_missing` listája eddig is legfeljebb 500 elemű (WP-BE-018), a séma 1000-et enged. A CRUD-listák opcionális `next_cursor`-ját a backend nem küldi: a lista teljes.
 - **Indok:** A sémafrissítéssel zárul a WP-BE-013 (a gyaloglási idő felső korlátja a sémában). A végponttábla-teszt egy átnevezett, rossz sémához kötött vagy hiányzó útvonalat a backend tesztjében fog meg, nem az app integrációjakor.
 - **Érintett:** `.waypost-schema-version`, `composer.json`, `src/Http/ErrorRenderer.php`, `src/Http/Exceptions/ApiException.php`, `src/Schedule/Expansion.php`, `tests/Feature/Api/EndpointsTest.php`, `ErrorFormatTest.php`, `SchemaValidationTest.php`, `SyncPushFinalTest.php`, WP-BE-013.
+
+## 2026-11-05 – Naplózás (WP-BE-035)
+
+- **Kérdés:** A csomag a kritikus eseményeket (láncelutasítás, halasztott vetület, félbemaradt kérés, újraküldött jelentés, takarítás) nem naplózta; az M7 próbaidőszakban a hibák oka utólag nehezen derülne ki. Mit naplózzon, és hová?
+- **Döntés:**
+  - Csatorna: `waypost.log_channel` (`WAYPOST_LOG_CHANNEL`); üresen a gazda alapértelmezettje. Minden üzenet a `Waypost\Support\Logger::channel()`-en megy, angolul, `Waypost:` előtaggal; a kontextusban azonosítók (eszköz, telephely, bejegyzés, jelentés, kulcs), titok (token, eszköztitok, PIN) és e-mail-cím nem.
+  - **Push:** ha volt elutasított bejegyzés, egy sor a hibakódok darabszámával (`rejected: {chain_fork: 1}`). Csak `chain_gap`-nél `info` (a telefon saját újrapróbálkozása egy elveszett válasz után), `chain_fork`-nál vagy `bad_hmac`-nál `warning`. Ha a most elfogadott bejegyzések közül van, amelyik még nem alkalmazható (ismeretlen hivatkozás, offline betanítás), `info` a számukkal; a korábbiak újrapróbálása nem naplóz, különben minden push ismételné. A vetület kivétele `error` (WP-BE-008).
+  - **`Idempotency-Key`:** a még futó kérés ismétlése (`409`) `info`, a félbemaradt kérés újrafuttatása (WP-BE-003) `warning`, a kulccsal, az útvonallal és a tárolás idejével.
+  - **Jelentés:** az elhagyott foglalás újraküldése `warning` (WP-BE-004, WP-BE-020).
+  - **Takarítás:** a `PruneExpiredData` végén `info` a táblánként törölt sorok számával (a fotók és a jelentésfájlok külön) és a futásidővel.
+  - A visszafejthetetlen eszköztitok (WP-BE-033) kivétel: azt a gazda kivételkezelője naplózza.
+- **Indok:** A darabszámos összegzés pushonként és takarításonként egy sor, így a napló a próbaidőszak terhelése mellett is olvasható marad; a részletek (melyik bejegyzés) az adatbázisban (`chain_entries.verify_status`, `device_diagnostics`) vannak. Saját csatorna, hogy az üzemeltető külön fájlba vagy külön szolgáltatásba terelhesse.
+- **Érintett:** `config/waypost.php`, `src/Support/Logger.php`, `src/Chain/ChainProcessor.php`, `PushResult.php`, `src/Http/Middleware/HandleIdempotencyKey.php`, `src/Reports/ReportSender.php`, `src/Jobs/PruneExpiredData.php`, `tests/Pest.php` (`packageLog()`), README.
+

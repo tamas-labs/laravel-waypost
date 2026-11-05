@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Waypost\Chain;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\ErrorCode;
@@ -16,6 +15,7 @@ use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
 use Waypost\Models\Media;
 use Waypost\Models\Shift;
+use Waypost\Support\Logger;
 use Waypost\Support\Time;
 
 /**
@@ -66,7 +66,19 @@ final readonly class ChainProcessor
             foreach ($entries as $data) {
                 $this->receive($device, ChainEntry::fromPush($data), $incoming, $result);
             }
-            $this->projectPending($device, $lastSeq);
+            $waiting = $this->projectPending($device, $lastSeq);
+            $rejected = $result->rejectedCounts();
+            if ($rejected !== []) {
+                // A gap is the phone's own retry after a lost response; a fork or a wrong HMAC needs a look.
+                Logger::channel()->log(array_keys($rejected) === [ErrorCode::ChainGap->value] ? 'info' : 'warning', 'Waypost: a push had rejected entries.', [
+                    'device_id' => $device->id, 'site_id' => $device->site_id, 'last_seq' => $device->last_seq, 'rejected' => $rejected,
+                ]);
+            }
+            if ($waiting > 0) {
+                Logger::channel()->info('Waypost: accepted chain entries wait for what they refer to.', [
+                    'device_id' => $device->id, 'site_id' => $device->site_id, 'waiting' => $waiting,
+                ]);
+            }
 
             // Without updated_at: the chain state is no change for the pull.
             $device->timestamps = false;
@@ -219,9 +231,11 @@ final readonly class ChainProcessor
      * of the device too, and its data would stay on the phone.
      *
      * @param  int  $lastSeq  the device's last_seq before this push
+     * @return int how many of the entries accepted now could not be applied yet
      */
-    private function projectPending(Device $device, int $lastSeq): void
+    private function projectPending(Device $device, int $lastSeq): int
     {
+        $waiting = 0;
         $pending = fn () => ChainEntry::query()
             ->where('device_id', $device->id)
             ->where('verify_status', VerifyStatus::Ok)
@@ -230,19 +244,23 @@ final readonly class ChainProcessor
 
         $pending()->where('seq', '<=', $lastSeq)->limit(self::PENDING_LIMIT)->get()
             ->concat($pending()->where('seq', '>', $lastSeq)->get())
-            ->each(function (ChainEntry $entry) use ($device): void {
+            ->each(function (ChainEntry $entry) use ($device, $lastSeq, &$waiting): void {
                 try {
-                    DB::transaction(function () use ($device, $entry): void {
+                    DB::transaction(function () use ($device, $entry, $lastSeq, &$waiting): void {
                         if ($this->projector->apply($device, $entry)) {
                             $entry->update(['projected_at' => Time::now()]);
+                        } elseif ($entry->seq > $lastSeq) {
+                            $waiting++;
                         }
                     });
                 } catch (Throwable $exception) {
-                    Log::error('Waypost: a chain entry could not be applied; it stays unapplied.', [
+                    Logger::channel()->error('Waypost: a chain entry could not be applied; it stays unapplied.', [
                         'device_id' => $device->id, 'entry_id' => $entry->id, 'seq' => $entry->seq, 'exception' => $exception,
                     ]);
                 }
             });
+
+        return $waiting;
     }
 
     /** @return list<string> */

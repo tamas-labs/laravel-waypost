@@ -6,7 +6,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Console\Scheduling\Schedule as Scheduler;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -197,7 +196,7 @@ it('sends the weekly report without the thumbnail of a photo too large to unpack
 
 it('sends a report again once the claim of an attempt that died is abandoned, without the PDF it left', function (): void {
     $fixture = periodReportSite(ReportFrequency::Weekly);
-    $log = Log::spy();
+    $log = packageLog();
     travelTo(CarbonImmutable::parse('2026-11-09T09:00:00Z'));
     // As if the first attempt had claimed the report and stored its PDF, and its worker was killed while sending.
     $claim = Report::factory()->create(['site_id' => $fixture['site']->id, 'type' => ReportFrequency::Weekly, 'path' => 'waypost/reports/left.pdf',

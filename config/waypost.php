@@ -22,6 +22,12 @@ return [
     'guard' => env('WAYPOST_GUARD', 'waypost'),
 
     /*
+    | Log channel of the package's messages (rejected chain entries, entries waiting for their references, an
+    | Idempotency-Key still running or abandoned, a report sent again, the nightly prune). Empty: the host's default.
+    */
+    'log_channel' => env('WAYPOST_LOG_CHANNEL'),
+
+    /*
     | Rate limits of the API, in requests per minute: "api" per token owner (user or device), "login" per
     | e-mail address and IP address, "login_ip" per IP address (whatever the address tried; behind a proxy
     | the host's TrustProxies decides the IP), "pin" per token owner on the requests that give a PIN (each of them

@@ -159,11 +159,15 @@ it('answers conflict while the first request with the key still runs', function 
     $token = supervisorToken($user);
     write($token)->assertCreated();
     IdempotencyKey::query()->update(['response_status' => null, 'response_body' => null]);
+    $log = packageLog();
 
     $response = write($token)->assertStatus(409)->assertHeader('Retry-After', '5');
 
     expect($response)->toMatchSchema('api/error');
     expect($response->json('error.message'))->toBe('Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.');
+    $log->shouldHaveReceived('info')->once()->withArgs(
+        fn (string $message, array $context): bool => $context === ['owner_type' => 'waypost.user', 'owner_id' => $user->id, 'key' => KEY],
+    );
 });
 
 it('runs the request again once its first attempt was abandoned without a response', function (): void {
@@ -175,7 +179,12 @@ it('runs the request again once its first attempt was abandoned without a respon
     travelTo(Time::fromIso('2026-10-27T20:04:59.999Z'));
     write($token)->assertStatus(409)->assertHeader('Retry-After', '5');
     travelTo(Time::fromIso('2026-10-27T20:05:00.000Z'));
+    $log = packageLog();
     write($token)->assertCreated()->assertHeaderMissing('Idempotent-Replayed');
+    $log->shouldHaveReceived('warning')->once()->withArgs(
+        fn (string $message, array $context): bool => $context['key'] === KEY && $context['path'] === '/api/waypost/v1/_test/sites'
+            && $context['created_at'] === '2026-10-27T20:00:00.000Z',
+    );
     write($token)->assertCreated()->assertHeader('Idempotent-Replayed', 'true');
 
     expect(Site::query()->count())->toBe(2);

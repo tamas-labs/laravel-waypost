@@ -9,7 +9,6 @@ use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -19,6 +18,7 @@ use Waypost\Mail\ReportMail;
 use Waypost\Models\Report;
 use Waypost\Models\Site;
 use Waypost\Models\User;
+use Waypost\Support\Logger;
 use Waypost\Support\Time;
 
 /**
@@ -158,7 +158,7 @@ final class ReportSender
         }
 
         $delivered = $abandoned->delivered_to ?? [];
-        Log::warning('Waypost: a report claimed but not sent to everyone is sent again, to the rest; its previous attempt failed or died.', [
+        Logger::channel()->warning('Waypost: a report claimed but not sent to everyone is sent again, to the rest; its previous attempt failed or died.', [
             'report_id' => $abandoned->id, 'site_id' => $site->id, 'type' => $type->value, 'generated_at' => Time::iso($abandoned->generated_at),
             'delivered_to' => $delivered,
         ]);
