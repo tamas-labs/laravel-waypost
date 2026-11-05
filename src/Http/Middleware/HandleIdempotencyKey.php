@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -33,6 +34,9 @@ use Waypost\Support\Time;
  * - The same key with another request (method, path, body): validation_failed.
  * - The same key while its first request still runs: conflict (409) with a Retry-After header, which tells it apart
  *   from a conflict of the request itself: the app's outbox retries it with the same key instead of giving it up.
+ * - A key without a response after ABANDONED_AFTER_S counts as abandoned: its request died without cleaning up (a
+ *   fatal error, a timeout, a killed worker), and the next attempt runs it again. Otherwise the outbox, which waits
+ *   behind it in order, would stall for TTL_HOURS. The write requests are safe to run again: a create finds its ID.
  * - A server error (5xx) is not stored: the request may be retried with the same key.
  */
 final class HandleIdempotencyKey
@@ -45,6 +49,9 @@ final class HandleIdempotencyKey
 
     /** Seconds after which a request whose key is still busy may be retried. */
     public const int BUSY_RETRY_AFTER_S = 5;
+
+    /** Seconds after which a key without a response is taken as abandoned: far beyond any write request's run time. */
+    public const int ABANDONED_AFTER_S = 300;
 
     /** @param  Closure(Request): Response  $next */
     public function handle(Request $request, Closure $next): Response
@@ -111,8 +118,8 @@ final class HandleIdempotencyKey
     private function find(User|Device $owner, string $key): ?IdempotencyKey
     {
         $record = IdempotencyKey::query()->whereMorphedTo('owner', $owner)->where('key', $key)->first();
-        if ($record !== null && $record->expires_at <= Time::now()) {
-            // Expired, but not cleaned up yet: as if it were new.
+        if ($record !== null && ($record->expires_at <= Time::now() || self::abandoned($record))) {
+            // Expired or abandoned, but not cleaned up yet: as if it were new.
             $record->delete();
 
             return null;
@@ -166,6 +173,17 @@ final class HandleIdempotencyKey
         }
 
         return JsonResponse::fromJsonString($record->response_body, $record->response_status, [self::REPLAYED_HEADER => 'true']);
+    }
+
+    private static function abandoned(IdempotencyKey $record): bool
+    {
+        return $record->response_status === null && $record->created_at !== null && $record->created_at <= self::abandonedBefore();
+    }
+
+    /** Keys still without a response that were created before this have been abandoned (also for PruneIdempotencyKeys). */
+    public static function abandonedBefore(): CarbonImmutable
+    {
+        return Time::now()->subSeconds(self::ABANDONED_AFTER_S);
     }
 
     private static function busy(): ApiException

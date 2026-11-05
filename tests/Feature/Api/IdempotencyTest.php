@@ -166,6 +166,22 @@ it('answers conflict while the first request with the key still runs', function 
     expect($response->json('error.message'))->toBe('Ugyanez a kérés még feldolgozás alatt van, próbáld újra később.');
 });
 
+it('runs the request again once its first attempt was abandoned without a response', function (): void {
+    $token = supervisorToken(User::factory()->supervisor()->create());
+    write($token)->assertCreated();
+    // As after a fatal error or a killed worker: the key was stored, the response never.
+    IdempotencyKey::query()->update(['response_status' => null, 'response_body' => null]);
+
+    travelTo(Time::fromIso('2026-10-27T20:04:59.999Z'));
+    write($token)->assertStatus(409)->assertHeader('Retry-After', '5');
+    travelTo(Time::fromIso('2026-10-27T20:05:00.000Z'));
+    write($token)->assertCreated()->assertHeaderMissing('Idempotent-Replayed');
+    write($token)->assertCreated()->assertHeader('Idempotent-Replayed', 'true');
+
+    expect(Site::query()->count())->toBe(2);
+    expect(IdempotencyKey::query()->sole()->response_status)->toBe(201);
+});
+
 it('runs the request again once the key has expired', function (): void {
     $token = supervisorToken(User::factory()->supervisor()->create());
     write($token)->assertCreated();
@@ -212,15 +228,19 @@ it('fingerprints a multipart upload by its fields and file contents, not by its 
     $upload('jpeg bytes', 'def')->assertUnprocessable();
 });
 
-it('prunes the expired keys hourly', function (): void {
+it('prunes the expired and the abandoned keys hourly', function (): void {
     $user = User::factory()->supervisor()->create();
     $expired = IdempotencyKey::factory()->for($user, 'owner')->create(['expires_at' => Time::now()]);
+    $abandoned = IdempotencyKey::factory()->for($user, 'owner')->create(['response_status' => null, 'response_body' => null]);
+    travelTo(Time::fromIso('2026-10-27T20:00:00.001Z'));
+    $running = IdempotencyKey::factory()->for($user, 'owner')->create(['response_status' => null, 'response_body' => null]);
+    travelTo(Time::fromIso('2026-10-27T20:05:00.000Z'));
     $alive = IdempotencyKey::factory()->for($user, 'owner')->create(['expires_at' => Time::now()->addMillisecond()]);
 
     dispatch(new PruneIdempotencyKeys());
 
-    expect(IdempotencyKey::query()->pluck('id')->all())->toBe([$alive->id]);
-    expect(IdempotencyKey::query()->find($expired->id))->toBeNull();
+    expect(IdempotencyKey::query()->orderBy('id')->pluck('id')->all())->toBe([$running->id, $alive->id]);
+    expect(IdempotencyKey::query()->whereKey([$expired->id, $abandoned->id])->exists())->toBeFalse();
 
     $events = array_filter(app(Schedule::class)->events(), fn ($event): bool => $event instanceof CallbackEvent && $event->description === 'waypost:prune-idempotency-keys');
     expect($events)->toHaveCount(1);

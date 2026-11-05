@@ -97,6 +97,7 @@ Nincs ilyen megállapítás.
   - a `PruneIdempotencyKeys` a régi, válasz nélküli kulcsokat is takarítsa;
   - teszt: a `run()` kihagyásával előállított árva kulcs.
 - **Bizonyosság:** magas a mechanizmusra; közepes a gyakoriságra (időtúllépés vagy OOM kell hozzá; a PDF-készítés nem ebben az útvonalban fut).
+- **Állapot:** javítva (2026-11-05): a létrejötte után 5 perccel (`HandleIdempotencyKey::ABANDONED_AFTER_S`) válasz nélkül maradt kulcs elhagyottnak számít, a következő próbálkozás újra lefuttatja a kérést, és a `PruneIdempotencyKeys` is törli. Migráció nem kellett (a `created_at` megvolt). Teszt: `IdempotencyTest`; döntés: `docs/decisions.md` (A még futó kérés jelzése).
 
 ### WP-BE-004 – Egy determinisztikus fatális hiba a PDF-készítésben végleg elveszíti a heti vagy havi jelentést, és ez nem derül ki
 
