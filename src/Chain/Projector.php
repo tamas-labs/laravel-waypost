@@ -302,7 +302,7 @@ final class Projector
 
     private function round(Device $device, string $id): ?Round
     {
-        return Round::query()->whereKey($id)->whereHas('shift', fn ($shift) => $shift->where('device_id', $device->id))->first();
+        return Round::query()->whereKey($id)->whereHas('shift', fn (Builder $shift) => $shift->where('device_id', $device->id))->first();
     }
 
     /** A version of a route of the device's site; the route may have been deleted since. */

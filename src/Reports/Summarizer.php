@@ -10,6 +10,7 @@ use DateTimeZone;
 use InvalidArgumentException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection as BaseCollection;
 use Waypost\Chain\TrustedTime;
 use Waypost\Enums\VerifyStatus;
@@ -177,7 +178,7 @@ final class Summarizer
                     ->where('started_at', '>=', self::text($searchStart))
                     ->where('started_at', '<', self::text($searchEnd))))
             ->with([
-                'guardUser' => fn ($guard) => $guard->withTrashed(),
+                'guardUser' => fn (BelongsTo $guard) => $guard->withTrashed(),
                 'rounds.scans',
                 'rounds.routeVersion.points',
             ])

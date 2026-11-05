@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   # The tests on both supported databases, and with the lowest dependencies composer.json allows (there is no
-  # composer.lock: a host gets whatever versions fit). PHPStan and Pint once, on the usual setup.
+  # composer.lock: a host gets whatever versions fit). PHPStan, the type coverage and Pint once, on the usual setup.
   check:
     name: tests (${{ matrix.db }}, ${{ matrix.dependencies }})
     runs-on: ubuntu-latest
@@ -76,6 +76,8 @@ jobs:
           DB_PORT: ${{ matrix.port }}
       - if: matrix.db == 'mysql' && matrix.dependencies == 'stable'
         run: composer analyse
+      - if: matrix.db == 'mysql' && matrix.dependencies == 'stable'
+        run: composer test:types
       - if: matrix.db == 'mysql' && matrix.dependencies == 'stable'
         run: composer lint
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waypost\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Waypost\Auth\Caller;
@@ -27,7 +28,7 @@ final class ReportSubscriptionController extends Controller
         $userId = self::uuidParameter($request, 'user_id');
         $subscriptions = ReportSubscription::query()
             ->whereIn('site_id', self::visibleSites($request, $caller))
-            ->when($userId, fn ($subscriptions, string $id) => $subscriptions->where('user_id', $id))
+            ->when($userId, fn (Builder $subscriptions, string $id) => $subscriptions->where('user_id', $id))
             ->orderBy('id')
             ->get();
 

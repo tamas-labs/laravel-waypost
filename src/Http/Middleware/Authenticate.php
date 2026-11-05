@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Waypost\Auth\Caller;
@@ -126,7 +127,7 @@ final readonly class Authenticate implements AuthenticatesRequests
                 ->whereKey($id)
                 ->where('role', Role::Supervisor)
                 ->where('active', true)
-                ->whereHas('sites', fn ($sites) => $sites->whereKey($device->site_id))
+                ->whereHas('sites', fn (Builder $sites) => $sites->whereKey($device->site_id))
                 ->first()
             : null;
 

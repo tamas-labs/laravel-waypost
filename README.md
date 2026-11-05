@@ -112,6 +112,7 @@ Helyben nem kell PHP és Composer: minden a Docker Compose `php` szolgáltatás�
 docker compose run --rm php composer install
 docker compose run --rm php composer test      # Pest, MySQL 8.4
 docker compose run --rm php composer analyse   # PHPStan (Larastan, 8-as szint)
+docker compose run --rm php composer test:types   # típuslefedettség, 100%
 docker compose run --rm php composer lint      # Pint
 docker compose run --rm --service-ports php composer serve   # demóadatokkal: http://localhost:8088
 ```

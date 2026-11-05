@@ -29,7 +29,8 @@
         "laravel/pint": "^1.32",
         "orchestra/testbench": "^11.3",
         "pestphp/pest": "^5.3",
-        "pestphp/pest-plugin-laravel": "^5.0"
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.1"
     },
     "repositories": [
         {
@@ -80,6 +81,7 @@
             "@php vendor/bin/testbench serve --host=0.0.0.0 --port=8000 --ansi"
         ],
         "test": "@php vendor/bin/pest",
+        "test:types": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100",
         "analyse": "@php vendor/bin/phpstan analyse --memory-limit=1G",
         "lint": "@php vendor/bin/pint --test",
         "format": "@php vendor/bin/pint"

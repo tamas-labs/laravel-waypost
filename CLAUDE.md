@@ -69,7 +69,7 @@ A gyökérnévtér `Waypost\` (`src/`), és a sémacsomagé `Waypost\Schema\` �
 - A bemenő JSON-t a `waypost/schema` sémái ellenőrzik (opis/json-schema); FormRequest nincs, a controller csak az adatbázisfüggő szabályokat nézi, és magyar hibát ad (`self::invalid()`, `ApiException::conflict()`). Ami csak a tárolt rekorddal együtt dönthető el, azt az entitásséma ellenőrzi mentés előtt (`SchemaValidator::assertValid()`). Ha egy sémamintát PHP-ban is használunk, a PCRE-be `D` módosítóval kerül (`/…$/D`), különben a `$` a záró sortörés előtt is illeszkedik; a teszt a sémafájlból olvasott mintával veti össze (`schemaPattern()`).
 - PHPStan (Larastan) 8-as szint a `src`, `config`, `tests` és `workbench` alatt; `ignoreErrors` csak indokolt, szűk (`identifier` + `path`) kivétellel. A Pest-tesztekben `$this->…` helyett a `Pest\Laravel\…` függvények (`travelTo()`, `actingAs()` …), mert a PHPStan a closure `$this`-ét nem ismeri.
 - Kódstílus: Pint, `per` preset (`pint.json`), `declare(strict_types=1)` minden fájlban.
-- Ha egy feladat lezárul: `composer test`, `composer analyse` és `composer lint` zöld; a `../waypost/docs/tasks.md`-ben pipa; az eldöntött kérdés a `docs/decisions.md`-be kerül.
+- Ha egy feladat lezárul: `composer test`, `composer analyse`, `composer test:types` és `composer lint` zöld; a `../waypost/docs/tasks.md`-ben pipa; az eldöntött kérdés a `docs/decisions.md`-be kerül.
 
 ## Parancsok
 
@@ -78,6 +78,7 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm php composer install` – függőségek. A `composer.lock` nincs commitolva (könyvtárcsomag).
 - `docker compose run --rm php composer test` – Pest (MySQL, `waypost_test`). Egy fájl / szűrő: `… php vendor/bin/pest tests/Unit/TimeTest.php --filter=…`.
 - `docker compose run --rm php composer analyse` – PHPStan.
+- `docker compose run --rm php composer test:types` – típuslefedettség (Pest type coverage, `--min=100`): minden paraméter, visszatérési érték és tulajdonság típusos, a closure-öké is.
 - `docker compose run --rm php composer lint` – Pint ellenőrzés; `composer format` – javítás.
 - PostgreSQL 16-on: `docker compose --profile pgsql up -d --wait pgsql`, majd `docker compose run --rm -e DB_CONNECTION=pgsql -e DB_HOST=pgsql -e DB_PORT=5432 php composer test`. Migrációt vagy nyers lekérdezést érintő változásnál futtasd.
 - `docker compose run --rm php sh scripts/install-smoke.sh` – a csomag telepítése egy friss Laravel 13 alkalmazásba (`composer require`, `waypost:install --migrate`, `waypost:create-supervisor`, belépés az alkalmazás HTTP-kernelén át, SQLite). A telepítést, a service providert vagy a csomag függőségeit érintő változásnál futtasd: a gazda valódi exception handlerét csak ez próbálja ki.
@@ -85,5 +86,5 @@ Helyben nincs PHP és Composer: minden a Docker Compose `php` szolgáltatásába
 - `docker compose run --rm --service-ports php composer serve` – build, majd a workbench a `http://localhost:8088` címen (`WAYPOST_PORT` felülírja; a 8000 a hoston foglalt).
 - `docker compose run --rm php vendor/bin/testbench <artisan parancs>` – artisan a workbench alkalmazásban.
 - `docker compose down` – leállítás; `down -v` a MySQL-adatokat is törli.
-- CI: `.github/workflows/ci.yml` – `main`-pushra és PR-re: a `waypost-schema` a `.waypost-schema-version` tagjén, `composer test` MySQL 8.4-en, PostgreSQL 16-on és a legalacsonyabb függőségekkel (`--prefer-lowest`), `analyse`, `lint`, és a `scripts/install-smoke.sh`.
+- CI: `.github/workflows/ci.yml` – `main`-pushra és PR-re: a `waypost-schema` a `.waypost-schema-version` tagjén, `composer test` MySQL 8.4-en, PostgreSQL 16-on és a legalacsonyabb függőségekkel (`--prefer-lowest`), `analyse`, `test:types`, `lint`, és a `scripts/install-smoke.sh`.
 - Ha a hoston a 3306-os port foglalt (más projekt MySQL-je), `WAYPOST_MYSQL_PORT=3307 docker compose …`; a `-T` kapcsoló kell, ha nincs terminál (`docker compose run --rm -T php …`).

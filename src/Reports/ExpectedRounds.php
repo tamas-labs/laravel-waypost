@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Waypost\Models\Round;
 use Waypost\Models\Route;
 use Waypost\Models\RouteVersion;
@@ -43,7 +44,7 @@ final class ExpectedRounds
     {
         /** @var Collection<string, Route> $routes */
         $routes = Route::query()->withTrashed()->where('site_id', $site->id)
-            ->with(['versions' => fn ($versions) => $versions->with('points')->orderBy('created_at')->orderBy('version')])
+            ->with(['versions' => fn (HasMany $versions) => $versions->with('points')->orderBy('created_at')->orderBy('version')])
             ->get()->keyBy('id');
         /** @var Collection<string, Schedule> $schedules */
         $schedules = Schedule::query()->withTrashed()->whereIn('route_id', $routes->keys()->all())->get()->keyBy('id');

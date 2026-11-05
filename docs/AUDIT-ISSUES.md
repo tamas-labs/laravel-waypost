@@ -522,6 +522,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Laravel package skeleton megfelelés*.
 - **Javítási irány:** `pest-plugin-type-coverage` és `composer test:types` (`--min=100`), a CI-ben is.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): `pestphp/pest-plugin-type-coverage` és `composer test:types` (`--min=100`), a CI-ben is; öt closure-paraméter kapott típust, a lefedettség 100%.
 
 ---
 
