@@ -6,17 +6,46 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-029). Két új migráció (`foreign key` indexek, `reports.delivered_to`) és új követelmény (`ext-fileinfo`): frissítés után `php artisan waypost:install --migrate`.
+
+### Security
+
+- A telephelyi telefonon (`X-Acting-User`) a supervisor a saját e-mail-címét, jelszavát és PIN-kódját csak akkor módosíthatja, ha a telefon telephelye az egyetlen telephelye (WP-BE-001).
+- A lánc hivatkozásai (útvonalverzió, menetrend, pont, leolvasás) csak az eszköz saját telephelyére mutathatnak; a más telephelyre mutató bejegyzés alkalmazatlan marad (WP-BE-002).
+- Jelszócserekor a felhasználó többi tokenje törlődik, a kérés sajátja megmarad (WP-BE-005).
+- A sorrenden kívül érkező, várakozó bejegyzés csak érvényes HMAC-kal tárolódik (WP-BE-017).
+- Belépésnél ismeretlen címre is lefut egy jelszóhash, így a válaszidő nem árulja el, létezik-e a cím; új, IP-nkénti korlát: `waypost.rate_limits.login_ip` (`WAYPOST_LOGIN_IP_RATE_LIMIT`, 30/perc) (WP-BE-012).
+- Külön korlát a PIN-t adó kérésekre (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`): `waypost.rate_limits.pin` (`WAYPOST_PIN_RATE_LIMIT`, 20/perc) (WP-BE-011).
+- A törölt pont fotóját is csak a pont telephelyén lehet feltölteni; eddig a törölt pont még nem létezőnek számított, és bárki tehetett rá fotót (WP-BE-015).
+- A fotó és a tárolt jelentés letöltése `X-Content-Type-Options: nosniff` fejlécet kap (WP-BE-016).
+
 ### Added
 
+- `waypost.guard` (`WAYPOST_GUARD`): a csomag guardjának neve; ha a gazdának már van ilyen nevű, más guardja, az alkalmazás hibával áll le (WP-BE-027).
+- `waypost.pull.settle_ms` (`WAYPOST_PULL_SETTLE_MS`, 5000): a pull ennyi ideig nem küldi a friss változásokat (WP-BE-022).
+- `composer test:types`: típuslefedettség, 100% (WP-BE-029).
+- README: *Üzemeltetés* szakasz (az eszköztoken kockázata, `APP_KEY`-csere, mentés, frissítés, queue worker, több szerver, NTP, TrustProxies) (WP-BE-009, WP-BE-028).
+- CI: MySQL 8.4 és PostgreSQL 16, a legalacsonyabb függőségekkel is, `composer analyse`, `composer test:types`, `composer lint`, és a telepítés egy friss Laravel-alkalmazásba (`scripts/install-smoke.sh`) (WP-BE-007), a `waypost-schema` rögzített tagjén.
 - `X-Waypost-Schema` fejléc a csomag útvonalainak minden válaszában: a `waypost/schema` verziója (`Paths::VERSION`), amellyel a szerver dolgozik.
-- CI (`.github/workflows/ci.yml`): `composer test` (MySQL 8.4), `composer analyse`, `composer lint`, a `waypost-schema` rögzített tagjén.
 
 ### Changed
 
+- Az ütemezett jobok `onOneServer()` és `ShouldBeUnique`, egy időszak jelentése egyszerre csak egyszer van sorban; a cache-nek közösnek kell lennie a szerverek között (WP-BE-019).
+- Egy push a korábbi pushok alkalmazatlan bejegyzéseiből legfeljebb 500-at próbál újra, a hiányzó fotók listája is legfeljebb 500 elemű (WP-BE-018).
+- A pull két lépésben tölt be (előbb a kulcsok, aztán csak a lap rekordjai a kapcsolataikkal) (WP-BE-021).
+- A jelentés egy lekérdezéssel olvassa a megőrzési időt; a `Summarizer` a várt köröket az `ExpectedRounds`-ból, a körsorokat a `RoundRows`-ból kapja (WP-BE-025, WP-BE-026).
+- A PIN-hozzárendelés zárolja az érintett telephelyeket a mentés commitjáig, így két egyidejű kérés nem adhatja ugyanazt a PIN-t (WP-BE-010).
+- Index minden idegen kulcson PostgreSQL-en és SQLite-on is (új migráció; MySQL-en nem változik semmi) (WP-BE-006).
+- Új követelmény: `ext-fileinfo`; `.gitattributes` (a kiadott archívumból kimaradnak a tesztek és a fejlesztői fájlok), `.editorconfig`, a `composer.json` metaadatai (WP-BE-023, WP-BE-024).
 - A `waypost/schema` függőség `^0.6`; a várt tag a `.waypost-schema-version` fájlban, egy teszt veti össze a `Paths::VERSION`-nel és a `composer.json`-nal.
 
 ### Fixed
 
+- Egy jelentés nem veszhet el egy küldés közben meghalt job miatt: a 15 percen belül el nem küldött foglalás felszabadul, és a túl nagy fotó nem bontódik ki a PDF-hez (WP-BE-004). Ha a küldés egy címzettnél bukik, a következő próbálkozás csak a maradéknak küld (`reports.delivered_to`, új migráció) (WP-BE-020).
+- A félbemaradt kérés `Idempotency-Key`-e 5 perc után újra futtatható, eddig 24 óráig `409`-et adott (WP-BE-003).
+- Egy hibás bejegyzés vetülete nem állítja meg a push többi bejegyzését: saját savepointban fut, a hiba a naplóba kerül, a bejegyzés alkalmazatlan marad (WP-BE-008).
+- A soha létre nem jött pont fotója a feltöltés után 31 nappal törlődik (WP-BE-015).
+- A fotó `taken_at`-ja nem lehet későbbi a szerver idejénél, így az aláírt link sem élhet tovább a megőrzésnél (WP-BE-014).
 - Menetrend-kibontás (`Expansion::resolve`): a tavaszi óraátállítás nem létező helyi idejénél kivétellel leállt, ha a PHP a rendszer időzóna-adatbázisát használja (pl. Ubuntu, slim TZif), mert a `getTransitions()` ott nem adja vissza a csak szabállyal megadott váltásokat. A váltás pillanatát most az eltolás alapján keresi; a beépített adatbázissal az eredmény ugyanaz. A CI-n derült ki.
 
 ## [0.2.0] – 2026-11-04
