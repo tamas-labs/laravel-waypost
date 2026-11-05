@@ -67,7 +67,7 @@ final class ReportController extends Controller
             throw ApiException::notFound();
         }
 
-        return $disk->response($record->path, basename($record->path), ['Cache-Control' => 'private, no-store']);
+        return $disk->response($record->path, basename($record->path), ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     /**

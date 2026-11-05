@@ -333,6 +333,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** OWASP API8 (biztonsági beállítás).
 - **Javítási irány:** `X-Content-Type-Options: nosniff` és `Content-Disposition: inline; filename=…` a fotó és a PDF letöltésénél.
 - **Bizonyosság:** közepes.
+- **Állapot:** javítva (2026-11-05): a fotó (`GET /media/{id}/file`) és a PDF (`GET /reports/{id}/file`) letöltése `X-Content-Type-Options: nosniff` fejlécet kap. A `Content-Disposition: inline; filename=…` fejlécet a Laravel `FilesystemAdapter::response()` eddig is küldte, ezt most a teszt is ellenőrzi. Teszt: `ReportsTest`; döntés: `docs/decisions.md` (Aláírt URL-ek).
 
 ### WP-BE-017 – A láncon kívüli (gap) bejegyzések HMAC-ellenőrzés nélkül tárolódnak
 

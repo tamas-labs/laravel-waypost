@@ -81,9 +81,11 @@ final class MediaController extends Controller
             throw ApiException::notFound();
         }
 
+        // inline; filename=<id>.jpg; without sniffing: the browser never takes a JPEG that looks like HTML for a page.
         return $disk->response($photo->path, basename($photo->path), [
             'Content-Type' => $photo->mime ?? self::JPEG,
             'Cache-Control' => 'private, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

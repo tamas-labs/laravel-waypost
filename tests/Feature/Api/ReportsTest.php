@@ -81,7 +81,8 @@ it('lists the reports of the supervisor\'s sites, newest first, with a signed li
 
     $file = get((string) $response->json('reports.1.download.url'));
 
-    $file->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    $file->assertOk()->assertHeader('Content-Type', 'application/pdf')->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('Content-Disposition', "inline; filename={$weekly->id}.pdf");
     expect($file->streamedContent())->toBe("%PDF-1.7 {$weekly->id}");
 });
 
@@ -164,7 +165,8 @@ it('signs a photo until the end of the data retention', function (): void {
     expect(Retention::days($site))->toBe(31)
         ->and(expiryOf($url))->toBe('2026-12-03T21:03:44.000Z');
     $file = get($url);
-    $file->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    $file->assertOk()->assertHeader('Content-Type', 'image/jpeg')->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('Content-Disposition', 'inline; filename=' . basename((string) $photo->path));
     expect($file->streamedContent())->toBe(jpegBytes($photo->id));
 
     // Another photo under the same signature.
