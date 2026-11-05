@@ -9,6 +9,7 @@ use Illuminate\Testing\TestResponse;
 use Waypost\Auth\Caller;
 use Waypost\Http\Middleware\Authenticate;
 use Waypost\Models\Device;
+use Waypost\Models\PersonalAccessToken;
 use Waypost\Models\Site;
 use Waypost\Models\User;
 use Waypost\Support\Time;
@@ -229,6 +230,30 @@ it('refuses X-Acting-User where acting is not allowed or with a supervisor token
     expectError(callAs('pull', deviceToken($device), $acting), 403, 'forbidden');
     expectError(callAs('device', deviceToken($device), $acting), 403, 'forbidden');
     expectError(callAs('config', supervisorToken($supervisor), $acting), 403, 'forbidden');
+});
+
+it('records when a token was last used, at most once a minute', function (): void {
+    travelTo(Time::fromIso('2026-10-27T20:00:00.123Z'));
+    $device = Device::factory()->create();
+    $token = deviceToken($device);
+    $stored = fn (): PersonalAccessToken => PersonalAccessToken::query()->sole();
+    $lastUsed = fn (): ?string => $stored()->last_used_at === null ? null : Time::iso($stored()->last_used_at);
+    $updatedAt = fn (): ?string => $stored()->updated_at === null ? null : Time::iso($stored()->updated_at);
+    $created = $updatedAt();
+    expect($lastUsed())->toBeNull();
+
+    callAs('device', $token)->assertOk();
+    expect($lastUsed())->toBe('2026-10-27T20:00:00.123Z')
+        // Not a change of the token.
+        ->and($updatedAt())->toBe($created);
+
+    travelTo(Time::fromIso('2026-10-27T20:00:59.999Z'));
+    callAs('device', $token)->assertOk();
+    expect($lastUsed())->toBe('2026-10-27T20:00:00.123Z');
+
+    travelTo(Time::fromIso('2026-10-27T20:01:00.123Z'));
+    callAs('device', $token)->assertOk();
+    expect($lastUsed())->toBe('2026-10-27T20:01:00.123Z');
 });
 
 it('authenticates every request on its own token', function (): void {

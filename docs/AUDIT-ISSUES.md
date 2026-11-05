@@ -642,6 +642,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül.
 - **Javítási irány:** Ritkított frissítés (pl. legfeljebb percenként egyszer), `timestamps = false`-szal.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `TokenGuard` az érvényes token `last_used_at`-jét legfeljebb percenként egyszer írja (`LAST_USED_RESOLUTION_S`), az `updated_at` nélkül. Teszt: `AuthenticationTest`; döntés: `docs/decisions.md` (Azonosítás / `waypost` guard).
 
 ### WP-BE-039 – Egy előfizetés lemondása azonnal rövidíti a megőrzési időt
 

@@ -21,11 +21,14 @@ use Waypost\Support\Time;
  * middleware answers device_revoked, except where the device may still upload (push-final).
  *
  * The result is kept on the request, not on the guard, so a long-lived guard never serves a previous request's
- * caller.
+ * caller. A valid token's last_used_at is kept up to date to the minute.
  */
 final readonly class TokenGuard implements Guard
 {
     private const string ATTRIBUTE = 'waypost.token_owner';
+
+    /** last_used_at is written at most this often, so that not every request writes to the token table. */
+    public const int LAST_USED_RESOLUTION_S = 60;
 
     public function __construct(private Container $container)
     {
@@ -98,7 +101,23 @@ final readonly class TokenGuard implements Guard
             default => false,
         };
 
+        if (!$valid) {
+            return null;
+        }
+        $this->touch($token);
+
         /** @var User|Device $owner */
-        return $valid ? $owner->withAccessToken($token) : null;
+        return $owner->withAccessToken($token);
+    }
+
+    /** Records the use, at most once per LAST_USED_RESOLUTION_S, without updated_at. */
+    private function touch(PersonalAccessToken $token): void
+    {
+        $now = Time::now();
+        if ($token->last_used_at === null || $token->last_used_at->lessThanOrEqualTo($now->subSeconds(self::LAST_USED_RESOLUTION_S))) {
+            $token->timestamps = false;
+            $token->forceFill(['last_used_at' => $now])->save();
+            $token->timestamps = true;
+        }
     }
 }

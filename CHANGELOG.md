@@ -49,6 +49,7 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 
 - Menetrend-kibontás: az ablaknál hosszabb lépésű intervallumos menetrend (pl. naponta egyszer, `interval_every_min = 1440`) `ValueError`-ral leállt; most egy kört ad (a `waypost/schema` `every-1440` vektora).
 - Egy jelentés nem veszhet el egy küldés közben meghalt job miatt: a 15 percen belül el nem küldött foglalás felszabadul, és a túl nagy fotó nem bontódik ki a PDF-hez (WP-BE-004). Ha a küldés egy címzettnél bukik, a következő próbálkozás csak a maradéknak küld (`reports.delivered_to`, új migráció) (WP-BE-020).
+- A tokenek `last_used_at`-je eddig soha nem frissült; most percenként legfeljebb egyszer (WP-BE-038).
 - A félbemaradt kérés `Idempotency-Key`-e 5 perc után újra futtatható, eddig 24 óráig `409`-et adott (WP-BE-003).
 - Egy hibás bejegyzés vetülete nem állítja meg a push többi bejegyzését: saját savepointban fut, a hiba a naplóba kerül, a bejegyzés alkalmazatlan marad (WP-BE-008).
 - A soha létre nem jött pont fotója a feltöltés után 31 nappal törlődik (WP-BE-015).
