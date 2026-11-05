@@ -568,6 +568,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül.
 - **Javítási irány:** Dokumentálni; a 2. lépcsőben megfontolható egy rövidebb élettartam és egy belépéshez kötött megtekintő.
 - **Bizonyosság:** magas.
+- **Állapot:** dokumentálva (2026-11-05): a README *Üzemeltetés* fejezete és a `docs/decisions.md` (Aláírt URL-ek / A fotólink token nélkül is megnyílik) megnevezi a kockázatot; rövidebb élettartam és belépéshez kötött megtekintő a 2. lépcsőben. Kódváltozás nincs (a specifikáció előírása).
 
 ### WP-BE-033 – Az eszköztitok és az idempotencia-válaszok a gazda `APP_KEY`-ével titkosítottak
 
