@@ -202,17 +202,19 @@ it('takes the waiting entries in turn when the batch itself fills the gap betwee
 it('stops at a waiting entry that turns out to be wrong', function (): void {
     $device = Device::factory()->create();
     [, $entries] = chainOf($device, 4);
-    $forged = ['hash' => str_repeat('b', 64)] + $entries[2];
+    // Signed by the device, but on another chain.
+    $fork = ['prev_hash' => str_repeat('b', 64)] + $entries[2];
+    $fork['hash'] = EntryHash::of($fork, $device->secret);
 
-    pushAs($device, [$entries[0], $forged, $entries[3]])->assertOk();
+    pushAs($device, [$entries[0], $fork, $entries[3]])->assertOk();
     $response = pushAs($device, [$entries[1]])->assertOk();
 
     expect($response->json())->toMatchArray([
         'accepted' => [$entries[1]['id']],
         'last_seq' => 2,
-        'rejected' => [['id' => $forged['id'], 'code' => 'bad_hmac', 'expected_seq' => null]],
+        'rejected' => [['id' => $fork['id'], 'code' => 'chain_fork', 'expected_seq' => null]],
     ]);
-    expect(ChainEntry::query()->whereKey($forged['id'])->firstOrFail()->verify_status)->toBe(VerifyStatus::BadHmac)
+    expect(ChainEntry::query()->whereKey($fork['id'])->firstOrFail()->verify_status)->toBe(VerifyStatus::Fork)
         ->and(ChainEntry::query()->whereKey($entries[3]['id'])->firstOrFail()->verify_status)->toBe(VerifyStatus::Gap);
 
     // The real entry replaces the wrong one, and the one waiting behind it follows.
@@ -251,6 +253,23 @@ it('checks the seq before the previous hash and the HMAC', function (): void {
     $wrong = ['prev_hash' => str_repeat('c', 64), 'hash' => str_repeat('d', 64)] + $entries[1];
 
     expect(pushAs($device, [$wrong])->assertOk()->json('rejected'))->toBe([['id' => $wrong['id'], 'code' => 'chain_gap', 'expected_seq' => 1]]);
+});
+
+it('stores a gap entry only with the device\'s HMAC, and never lets a forged one replace a waiting one', function (): void {
+    $device = Device::factory()->create();
+    [, $entries] = chainOf($device, 4);
+    pushAs($device, [$entries[0], $entries[3]])->assertOk();
+    $forged = fn (array $entry): array => ['hash' => str_repeat('e', 64)] + $entry;
+
+    $response = pushAs($device, [$forged($entries[2]), $forged($entries[3]), $forged(['id' => Uuid::v7(), 'seq' => 900] + $entries[2])])->assertOk();
+
+    expect($response->json('rejected.*.code'))->toBe(['chain_gap', 'chain_gap', 'chain_gap'])
+        ->and($response->json('rejected.*.expected_seq'))->toBe([2, 2, 2])
+        ->and(ChainEntry::query()->orderBy('seq')->pluck('seq')->all())->toBe([1, 4])
+        ->and(ChainEntry::query()->whereKey($entries[3]['id'])->value('hash'))->toBe($entries[3]['hash']);
+    expect(pushAs($device, [$entries[1], $entries[2]])->assertOk()->json())->toMatchArray([
+        'accepted' => idsOf([$entries[1], $entries[2], $entries[3]]), 'last_seq' => 4, 'rejected' => [],
+    ]);
 });
 
 it('checks the previous hash before the HMAC', function (): void {

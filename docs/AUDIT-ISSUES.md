@@ -345,6 +345,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** OWASP API4. A specifikáció *Szerveroldali ellenőrzés* 1. pontja ezt megengedi.
 - **Javítási irány:** A gap bejegyzésre is HMAC-ellenőrzés tárolás előtt (a hamisat ne tárolja, csak jelezze). Felső korlát a várakozó bejegyzések számára, illetve a `last_seq`-től való távolságra.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): a `gap` bejegyzés csak az eszköz érvényes HMAC-jával tárolódik. A hamis aláírású `chain_gap` választ kap (a várt `seq`-kel, a szerződés nem változik), de a szerver nem tárolja, nem cserél le vele várakozó bejegyzést, és az azonosítóját sem foglalja le. A `last_seq`-től mért távolságra nem kellett korlát: aláírt bejegyzést csak az eszköz készíthet. Teszt: `SyncPushTest`; döntés: `docs/decisions.md` (A push feldolgozása).
 
 ### WP-BE-018 – Minden push az összes ki nem vetített bejegyzést és az összes hiányzó fotót újra lekérdezi, korlát nélkül
 

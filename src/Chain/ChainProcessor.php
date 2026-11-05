@@ -25,6 +25,10 @@ use Waypost\Support\Time;
  * A rejected entry is stored too, as evidence, in its seq's only place. A gap entry waits there and is checked again when
  * its turn comes; a fork or bad_hmac entry stays until an entry with its seq arrives, which replaces it: otherwise whoever
  * holds the token but not the secret could block the chain for good. Only ok entries reach the projections.
+ *
+ * A gap entry is stored only with the device's HMAC; one without it gets chain_gap all the same, but touches nothing.
+ * Otherwise whoever holds the token but not the secret could fill the table with entries at any seq, and push out
+ * the ones that wait.
  */
 final readonly class ChainProcessor
 {
@@ -70,6 +74,11 @@ final readonly class ChainProcessor
     /** @param  array<int, int>  $incoming  the seqs of the batch */
     private function receive(Device $device, ChainEntry $entry, array $incoming, PushResult $result): void
     {
+        if ($entry->seq > $device->last_seq + 1 && !EntryHash::matches($entry->content(), $device->secret)) {
+            $result->reject($entry->id, ErrorCode::ChainGap, $device->last_seq + 1);
+
+            return;
+        }
         if (!$this->claimId($device, $entry)) {
             $result->reject($entry->id, ErrorCode::ChainFork);
 
