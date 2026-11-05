@@ -54,3 +54,21 @@ it('uses the configured prefix', function (): void {
     config(['waypost.table_prefix' => 'waypost_']);
     expect(Artisan::call('migrate:fresh'))->toBe(0);
 });
+
+it('indexes every foreign key: PostgreSQL and SQLite do not do it by themselves, as InnoDB does', function (): void {
+    expect(Artisan::call('migrate:fresh'))->toBe(0);
+
+    $unindexed = [];
+    foreach (WAYPOST_TABLES as $table) {
+        $leading = array_map(fn (array $index): array => $index['columns'], Schema::getIndexes(Table::name($table)));
+        foreach (Schema::getForeignKeys(Table::name($table)) as $foreignKey) {
+            $columns = $foreignKey['columns'];
+            $covered = array_filter($leading, fn (array $indexed): bool => array_slice($indexed, 0, count($columns)) === $columns);
+            if ($covered === []) {
+                $unindexed[] = "{$table}." . implode(',', $columns);
+            }
+        }
+    }
+
+    expect($unindexed)->toBe([]);
+});

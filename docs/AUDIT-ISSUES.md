@@ -168,6 +168,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Specifikáció, *Repo és technológiai stack* („MySQL 8 vagy PostgreSQL 16”); audit szempont: *Adatbázis és migrációk*, *Teljesítmény*.
 - **Javítási irány:** Új migráció (nem a meglévők módosítása, lásd WP-BE-037) a felsorolt oszlopok indexeivel. A PostgreSQL-próbában ellenőrzés a `pg_indexes` alapján (a `MigrationsTest` mintájára).
 - **Bizonyosság:** magas a hiányzó indexekre; közepes a hatás mértékére (nem mértem nagy adatmennyiségen).
+- **Állapot:** javítva (2026-11-05): új migráció (`2026_11_05_000018_add_waypost_foreign_key_indexes.php`) mind a 23 index nélküli idegen kulcs oszlopra (a felsoroltak és a szülőtörlések ellenőrzését gyorsító többi); MySQL-en nem változtat. A `MigrationsTest` minden adatbázison ellenőrzi, hogy minden idegen kulcsnak van indexe. Döntés: `docs/decisions.md` (CI … index minden idegen kulcson).
 
 ### WP-BE-007 – Nincs CI: a tesztek, a PHPStan és a Pint csak kézzel, helyben futnak
 

@@ -27,14 +27,14 @@ composer require --no-interaction --quiet waypost/laravel-waypost:0.1.0
 step "php artisan waypost:install --migrate"
 php artisan waypost:install --migrate --no-interaction
 [ -f config/waypost.php ] || fail "config/waypost.php was not published"
-published=$(ls database/migrations | grep -c '_create_waypost_') || true
+published=$(ls database/migrations | grep -c '_waypost_') || true
 expected=$(ls "$package_dir/database/migrations" | grep -c '\.php$')
 [ "$published" -eq "$expected" ] || fail "published $published migrations, expected $expected"
 php artisan migrate:status --no-interaction | grep -q 'create_waypost_users_table .* Ran' || fail "the migrations did not run"
 
 step "php artisan waypost:install again: nothing new"
 php artisan waypost:install --migrate --no-interaction | grep -q 'A migrációk már publikálva vannak.' || fail "the second run published migrations"
-[ "$(ls database/migrations | grep -c '_create_waypost_')" -eq "$expected" ] || fail "the second run duplicated migrations"
+[ "$(ls database/migrations | grep -c '_waypost_')" -eq "$expected" ] || fail "the second run duplicated migrations"
 
 step "php artisan waypost:create-supervisor"
 php artisan waypost:create-supervisor --name='Smoke Supervisor' --email=smoke@example.com --password=smoke-password --no-interaction
