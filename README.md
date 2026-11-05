@@ -55,6 +55,7 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 | `WAYPOST_ROUTE_PREFIX` | `api/waypost/v1` | az API útvonalainak előtagja |
 | `WAYPOST_RATE_LIMIT` | `240` | kérés percenként, tokentulajdonosonként |
 | `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, e-mail-címenként és IP-címenként |
+| `WAYPOST_PIN_RATE_LIMIT` | `20` | PIN-t adó kérés (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) percenként, tokentulajdonosonként; mindegyik a telephelyek minden felhasználójára újraszámolja a PIN-t |
 | `WAYPOST_TABLE_PREFIX` | `waypost_` | a csomag tábláinak előtagja; csak az első migráció előtt változtasd |
 | `WAYPOST_DISK` | `local` | a fotók és a PDF-jelentések tárhelye; privát disk legyen |
 | `WAYPOST_REPORT_URL_TTL_MIN` | `60` | a jelentésarchívum (`GET /reports`) letöltési linkjének élettartama percben; a fotók linkje az adatmegőrzés végéig él |

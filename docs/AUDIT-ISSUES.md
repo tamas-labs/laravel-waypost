@@ -251,6 +251,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Teljesítmény*, *Biztonság (API4)*. A specifikáció az ellenőrzést előírja, a módját nem.
 - **Javítási irány:** Külön, szigorúbb rate limit a PIN-et érintő végpontokra (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`), és mérés a várható legnagyobb telephelyméretre.
 - **Bizonyosság:** közepes.
+- **Állapot:** javítva (2026-11-05): a PIN-t adó három végpont (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) a `waypost` mellett a szigorúbb `waypost-pin` korlát alá is esik: percenként `waypost.rate_limits.pin` (`WAYPOST_PIN_RATE_LIMIT`, alapból 20) a token gazdájára. A 429-et az app outboxa újrapróbálja. Teszt: `UsersTest`; döntés: `docs/decisions.md` (Az API-keret / Rate limit).
 
 ### WP-BE-012 – A login időzítése elárulja, létezik-e a fiók, és a limit csak e-mail + IP párosra szól
 

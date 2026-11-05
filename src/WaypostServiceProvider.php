@@ -130,6 +130,9 @@ final class WaypostServiceProvider extends ServiceProvider
         RateLimiter::for('waypost', fn (Request $request): Limit => Limit::perMinute((int) config('waypost.rate_limits.api'))
             ->by(self::rateLimitKey($request)));
 
+        RateLimiter::for('waypost-pin', fn (Request $request): Limit => Limit::perMinute((int) config('waypost.rate_limits.pin'))
+            ->by(self::rateLimitKey($request)));
+
         RateLimiter::for('waypost-login', function (Request $request): Limit {
             $email = $request->input('email');
 

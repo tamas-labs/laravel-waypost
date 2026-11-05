@@ -16,11 +16,14 @@ return [
 
     /*
     | Rate limits of the API, in requests per minute: "api" per token owner (user or device), "login" per
-    | e-mail address and IP address. Above the limit: 429 rate_limited with a Retry-After header.
+    | e-mail address and IP address, "pin" per token owner on the requests that give a PIN (each of them
+    | hashes the PIN again for every user of the sites, a second or two of CPU). Above the limit: 429
+    | rate_limited with a Retry-After header.
     */
     'rate_limits' => [
         'api' => (int) env('WAYPOST_RATE_LIMIT', 240),
         'login' => (int) env('WAYPOST_LOGIN_RATE_LIMIT', 5),
+        'pin' => (int) env('WAYPOST_PIN_RATE_LIMIT', 20),
     ],
 
     /*

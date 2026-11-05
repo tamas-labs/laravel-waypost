@@ -353,6 +353,21 @@ it('locks the user\'s sites while it gives a PIN, until the user is saved', func
     'a new site' => [fn (User $guard, User $supervisor, Site $a, Site $b) => callApi('POST', "sites/{$b->id}/users", $supervisor, ['user_id' => $guard->id])],
 ]);
 
+it('limits the requests that give a PIN more strictly, per caller', function (): void {
+    config(['waypost.rate_limits.pin' => 2]);
+    $site = Site::factory()->create();
+    $supervisor = supervisorOf($site);
+    $guard = fn (string $name): array => ['name' => $name, 'role' => 'guard', 'site_ids' => [$site->id]];
+
+    $created = callApi('POST', 'users', $supervisor, $guard('Kiss Péter'))->assertCreated();
+    callApi('PUT', "users/{$created->json('user.id')}/pin", $supervisor)->assertOk();
+    $response = callApi('POST', 'users', $supervisor, $guard('Nagy Ádám'))->assertStatus(429)->assertHeader('Retry-After');
+
+    expect($response->json('error.code'))->toBe('rate_limited');
+    callApi('PATCH', "users/{$created->json('user.id')}", $supervisor, ['name' => 'Kiss Pál'])->assertOk();
+    callApi('POST', 'users', supervisorOf($site), $guard('Nagy Ádám'))->assertCreated();
+});
+
 it('deletes a user with their subscriptions and tokens', function (): void {
     $site = Site::factory()->create();
     $supervisor = supervisorOf($site);

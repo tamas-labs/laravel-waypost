@@ -24,7 +24,7 @@ use Waypost\Http\Middleware\ValidateSchema;
 
 // Loaded by WaypostServiceProvider::apiRoutes(): under waypost.route.prefix, named "waypost.…", with server_time
 // and the waypost.route.middleware. Middleware order of a route: Authenticate, throttling, HandleIdempotencyKey
-// (write requests), ValidateSchema.
+// (write requests), ValidateSchema. The requests that give a PIN have a stricter limit too ($pin).
 
 /**
  * The middleware of a write request: Idempotency-Key, and the body against the schema (api/<name>.request).
@@ -34,6 +34,8 @@ use Waypost\Http\Middleware\ValidateSchema;
 $write = fn (?string $schema = null): array => $schema === null
     ? [HandleIdempotencyKey::class]
     : [HandleIdempotencyKey::class, ValidateSchema::using("api/{$schema}.request")];
+
+$pin = ThrottleRequests::using('waypost-pin');
 
 // No token, so no Idempotency-Key: a repeated login only issues another token.
 Route::post('auth/login', [AuthController::class, 'login'])
@@ -91,7 +93,7 @@ Route::put('media/{media}', [MediaController::class, 'upload'])
 // column is never queried with something else).
 Route::middleware([Authenticate::using(Authenticate::SUPERVISOR, Authenticate::ACTING), ThrottleRequests::using('waypost')])
     ->whereUuid(['site', 'user', 'checkpoint', 'route', 'version', 'schedule', 'subscription'])
-    ->group(function () use ($write): void {
+    ->group(function () use ($write, $pin): void {
         Route::get('sites', [SiteController::class, 'index'])->name('sites.index');
         Route::post('sites', [SiteController::class, 'store'])->middleware($write('site-create'))->name('sites.store');
         Route::get('sites/{site}', [SiteController::class, 'show'])->name('sites.show');
@@ -99,14 +101,14 @@ Route::middleware([Authenticate::using(Authenticate::SUPERVISOR, Authenticate::A
         Route::delete('sites/{site}', [SiteController::class, 'destroy'])->middleware($write())->name('sites.destroy');
 
         Route::get('sites/{site}/users', [SiteUserController::class, 'index'])->name('sites.users.index');
-        Route::post('sites/{site}/users', [SiteUserController::class, 'store'])->middleware($write('site-user-attach'))->name('sites.users.store');
+        Route::post('sites/{site}/users', [SiteUserController::class, 'store'])->middleware([$pin, ...$write('site-user-attach')])->name('sites.users.store');
         Route::delete('sites/{site}/users/{user}', [SiteUserController::class, 'destroy'])->middleware($write())->name('sites.users.destroy');
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');
-        Route::post('users', [UserController::class, 'store'])->middleware($write('user-create'))->name('users.store');
+        Route::post('users', [UserController::class, 'store'])->middleware([$pin, ...$write('user-create')])->name('users.store');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
         Route::patch('users/{user}', [UserController::class, 'update'])->middleware($write('user-update'))->name('users.update');
-        Route::put('users/{user}/pin', [UserController::class, 'pin'])->middleware($write('user-pin'))->name('users.pin');
+        Route::put('users/{user}/pin', [UserController::class, 'pin'])->middleware([$pin, ...$write('user-pin')])->name('users.pin');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware($write())->name('users.destroy');
 
         Route::get('checkpoints', [CheckpointController::class, 'index'])->name('checkpoints.index');
