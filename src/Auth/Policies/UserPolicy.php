@@ -14,6 +14,10 @@ use Waypost\Models\User;
  * of one shared site could take over a colleague's account (e-mail, password, PIN) and with it the colleague's
  * other sites. Nobody deletes themselves; as the caller manages every site of the user, no site loses its last
  * supervisor this way.
+ *
+ * A supervisor changes their own data (e-mail, password, PIN) with their own token. Through the site phone
+ * (X-Acting-User) they are bound to the phone's site like everyone else: the request proves only the device token,
+ * not the supervisor's PIN, and their e-mail address, password and PIN would open their other sites too.
  */
 final class UserPolicy extends Policy
 {
@@ -47,7 +51,7 @@ final class UserPolicy extends Policy
     /** Also the PIN, and assigning the user to another site (which gives them a new PIN). */
     public function update(Caller $caller, User $user): Response
     {
-        return $this->isSelf($caller, $user) ? Response::allow() : $this->manage($caller, $user);
+        return $this->isSelf($caller, $user) && !$caller->isActing() ? Response::allow() : $this->manage($caller, $user);
     }
 
     public function delete(Caller $caller, User $user): Response

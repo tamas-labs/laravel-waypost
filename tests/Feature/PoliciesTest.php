@@ -143,8 +143,18 @@ it('keeps the acting supervisor on the site phone\'s site', function (): void {
     expect(outcome(inspect($caller, 'update', Checkpoint::factory()->for($other)->create())))->toBe(404);
     expect(outcome(inspect($caller, 'create', [Checkpoint::class, $other->id])))->toBe(403);
     expect(outcome(inspect($caller, 'update', $guardElsewhere)))->toBe(404);
-    expect(outcome(inspect($caller, 'update', $supervisor)))->toBe('allow');
+    // Their own e-mail address, password and PIN would open their other site too.
+    expect(outcome(inspect($caller, 'update', $supervisor)))->toBe(403);
+    expect(outcome(inspect($caller, 'delete', $supervisor)))->toBe(403);
     expect(outcome(inspect($caller, 'create', Site::class)))->toBe(403);
+});
+
+it('lets the acting supervisor change themselves only if the site phone\'s site is their only one', function (): void {
+    [$own, , $supervisor] = twoSites();
+    $caller = deviceCaller(Device::factory()->for($own)->create(), $supervisor);
+
+    expect(outcome(inspect($caller, 'update', $supervisor)))->toBe('allow');
+    expect(outcome(inspect($caller, 'delete', $supervisor)))->toBe(403);
 });
 
 it('lets the site phone itself configure nothing', function (): void {

@@ -48,6 +48,7 @@ Nincs ilyen megállapítás.
   - vagy egyszerűbben: `acting` hívó ne módosíthasson `email` / `password` mezőt és PIN-t (403), saját magának sem;
   - a sémaleírásban rögzíteni (előbb a `waypost-schema`-ban), majd teszt az `EndpointsTest` / `UsersTest` mátrixba.
 - **Bizonyosság:** magas (a kódút igazolt: policy → controller → `$user->update($input)`; nincs olyan teszt, amely ezt az esetet tiltaná).
+- **Állapot:** javítva (2026-11-05): `acting` hívónál a `UserPolicy::update()` a saját rekordra is a `manage()` ágat követi; tesztek: `PoliciesTest`, `UsersTest`; döntés: `docs/decisions.md` (Konfigurációs CRUD: közös szabályok). A sémaleírás pontosítása (`waypost-schema`) még nyitott.
 
 ---
 

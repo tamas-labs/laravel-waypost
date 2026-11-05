@@ -245,6 +245,39 @@ it('changes or deletes only a user whose every site the caller manages', functio
     'delete' => ['DELETE', 'users/{user}', []],
 ]);
 
+it('does not let the site phone change the credentials of a supervisor who has other sites, not even their own', function (string $method, string $path, array $body): void {
+    [$phoneSite, $otherSite] = [Site::factory()->create(), Site::factory()->create()];
+    $supervisor = supervisorOf($phoneSite, $otherSite);
+    $supervisor->update(['email' => 'anna@example.com', 'pin_hash' => null]);
+    $password = $supervisor->password;
+
+    $response = callApi($method, str_replace('{user}', $supervisor->id, $path), $supervisor, $body, phone: Device::factory()->for($phoneSite)->create())
+        ->assertForbidden();
+
+    expect($response)->toMatchSchema('api/error');
+    expect($response->json('error.message'))->toBe('A felhasználó olyan telephelyhez is tartozik, amelyet nem kezelsz.');
+    $supervisor->refresh();
+    expect($supervisor->email)->toBe('anna@example.com');
+    expect($supervisor->password)->toBe($password);
+    expect($supervisor->pin_hash)->toBeNull();
+    // With their own token they still can.
+    callApi($method, str_replace('{user}', $supervisor->id, $path), $supervisor, $body)->assertOk();
+})->with([
+    'e-mail address' => ['PATCH', 'users/{user}', ['email' => 'attacker@example.com']],
+    'password' => ['PATCH', 'users/{user}', ['password' => 'attacker-password']],
+    'PIN' => ['PUT', 'users/{user}/pin', []],
+]);
+
+it('lets the site phone change the credentials of a supervisor whose only site it is', function (): void {
+    $site = Site::factory()->create();
+    $supervisor = supervisorOf($site);
+
+    callApi('PATCH', "users/{$supervisor->id}", $supervisor, ['email' => 'anna.nagy@example.com', 'password' => 'uj-titkos-jelszo'], phone: Device::factory()->for($site)->create())
+        ->assertOk();
+
+    postJson('api/waypost/v1/auth/login', ['email' => 'anna.nagy@example.com', 'password' => 'uj-titkos-jelszo', 'device_name' => 'Pixel 8'])->assertOk();
+});
+
 it('changes the PIN to a generated one, unique on all of the user\'s sites', function (): void {
     [$own, $theirs] = [Site::factory()->create(), Site::factory()->create()];
     $guard = User::factory()->withPin('111111')->create();
