@@ -6,6 +6,10 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+### Changed
+
+- A CI a `waypost/schema` 0.8.1-gyel fut (csak leírások: a WP-BE-001, WP-BE-003 és WP-BE-005 viselkedése a szerződésben, `docs/AUDIT-OTHER-REPOS.md` 1., 2. és 4. sor); a `^0.8` követelmény nem változik.
+
 ## [0.3.0] – 2026-11-05
 
 A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-042) és a `waypost/schema` 0.8.0. Három új migráció (`foreign key` indexek, `reports.delivered_to`, morph-aliasok), új követelmény (`ext-fileinfo`) és új sémaverzió (`waypost/schema` `^0.8`): frissítés `composer update waypost/laravel-waypost waypost/schema`, utána `php artisan waypost:install --migrate`.
