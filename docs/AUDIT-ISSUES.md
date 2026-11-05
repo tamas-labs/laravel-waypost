@@ -666,6 +666,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül.
 - **Javítási irány:** Elfogadható. Ha szigorítanának: újraaktiváláskor kötelező jelszócsere.
 - **Bizonyosság:** magas.
+- **Állapot:** elfogadva, dokumentálva (2026-11-05): a külön üzenet marad, mert a supervisornak meg kell tudnia, miért nem léphet be; a fiók ettől nem nyílik meg, a próbálgatást a belépési korlátok fogják. Döntés: `docs/decisions.md` (Azonosítás / Az inaktív fiók üzenete). Kódváltozás nincs.
 
 ### WP-BE-041 – 2. lépcső: egy új bejegyzéstípus kódváltozást kér a `Projector`-ban (a jelenlegi működés helyes)
 
