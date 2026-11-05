@@ -82,6 +82,9 @@ final class UserController extends Controller
      * active: false deactivates the user; their tokens stop working. Nobody deactivates themselves (the policy lets
      * only a supervisor of every site of the user change them, so no site loses its last active supervisor).
      *
+     * A new password ends the user's sessions (their tokens), but the one of the request: a token stolen before the
+     * change stops working, and who changed their own password stays logged in.
+     *
      * @return array{user: array<string, mixed>}
      */
     public function update(Request $request, User $user, Caller $caller): array
@@ -100,7 +103,12 @@ final class UserController extends Controller
             throw ApiException::forbidden('Saját magadat nem inaktiválhatod.');
         }
 
-        self::write(fn () => $user->update($input), self::EMAIL_TAKEN);
+        self::write(function () use ($user, $input, $caller): void {
+            $user->update($input);
+            if (array_key_exists('password', $input)) {
+                $user->tokens()->whereKeyNot($caller->token->id)->delete();
+            }
+        }, self::EMAIL_TAKEN);
 
         return self::userResponse($user, $caller);
     }

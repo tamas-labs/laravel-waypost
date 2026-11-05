@@ -216,8 +216,9 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
 
 - **Kérdés:** Mit ellenőriz a `POST /auth/login`, és mit ad vissza hibánál?
 - **Döntés:** A beírt címet kisbetűsítve keresi (a `User` kisbetűsen tárolja). Csak supervisor léphet be jelszóval; ismeretlen cím, őr és hibás jelszó ugyanazt kapja: `unauthenticated`, „Hibás e-mail-cím vagy jelszó.”. Inaktív supervisor helyes jelszóval: `unauthenticated`, „Ez a fiók inaktív, nem lehet vele belépni.”. A token `supervisor` képességű, nem jár le, a neve a `device_name`. A `POST /auth/logout` a kérés tokenjét törli, a supervisor többi tokenje marad; eszköztokennel `forbidden`.
+  - **Jelszócsere** (2026-11-05, WP-BE-005): a `PATCH /users/{id}` `password` mezője a felhasználó összes tokenjét törli, a kérés saját tokenjét kivéve. Így egy ellopott token a jelszócsere után nem működik, aki pedig a saját jelszavát cseréli, bejelentkezve marad. Ha más (egy kollégája vagy a telephelyi telefon) cseréli a jelszavát, minden eszközén újra be kell lépnie. Más mező (név, e-mail-cím) és a PIN cseréje a tokeneket nem érinti. A lejárat nélküli token marad, ahogy a specifikáció írja; az inaktivitási lejárat a `last_used_at` frissítésével együtt (WP-BE-038) kerülhet sorra.
 - **Indok:** A séma (`api/auth-login.response`) szerint a hibás belépés `401 unauthenticated`. Az inaktív fiók külön üzenete csak helyes jelszó után jelenik meg, így nem árulja el, hogy a cím létezik.
-- **Érintett:** `src/Http/Controllers/AuthController.php`, `routes/api.php`, M2-14.
+- **Érintett:** `src/Http/Controllers/AuthController.php`, `UserController.php`, `routes/api.php`, M2-14.
 
 ## 2026-10-28 – Policy-k (M2-15)
 

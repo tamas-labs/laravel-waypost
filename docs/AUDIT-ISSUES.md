@@ -140,6 +140,7 @@ Nincs ilyen megállapítás.
   - jelszócserekor a felhasználó összes tokenjének törlése, kivéve a hívó saját tokenjét, ha saját magát módosítja;
   - opcionálisan `last_used_at` és egy inaktivitási lejárat (lásd WP-BE-038).
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05): jelszócserekor a felhasználó összes tokenje törlődik, a kérés saját tokenjét kivéve. Az inaktivitási lejárat a WP-BE-038-cal együtt nyitott. Teszt: `UsersTest`; döntés: `docs/decisions.md` (Belépés és kijelentkezés / Jelszócsere).
 
 ### WP-BE-006 – PostgreSQL-en az idegen kulcsoknak nincs indexük, a jelentés és az adatmegőrzés legfontosabb illesztései teljes táblát olvasnak
 

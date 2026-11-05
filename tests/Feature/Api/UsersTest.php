@@ -186,6 +186,27 @@ it('updates a supervisor\'s credentials', function (): void {
     postJson('api/waypost/v1/auth/login', ['email' => 'anna.nagy@example.com', 'password' => 'uj-titkos-jelszo', 'device_name' => 'Pixel 8'])->assertOk();
 });
 
+it('ends the other sessions of a supervisor whose password changes', function (bool $self): void {
+    $site = Site::factory()->create();
+    $supervisor = supervisorOf($site);
+    $stolen = supervisorToken($supervisor);
+    $own = supervisorToken($supervisor);
+    $colleague = supervisorOf($site);
+    $colleagues = supervisorToken($colleague);
+    $caller = ['Authorization' => 'Bearer ' . ($self ? $own : $colleagues)];
+    $works = fn (string $token): bool => requestApi('GET', 'sites', ['Authorization' => "Bearer {$token}"])->isOk();
+
+    // Another field leaves the sessions alone.
+    requestApi('PATCH', "users/{$supervisor->id}", $caller, ['name' => 'Nagy Anna'])->assertOk();
+    expect($works($stolen))->toBeTrue();
+
+    requestApi('PATCH', "users/{$supervisor->id}", $caller, ['password' => 'uj-titkos-jelszo'])->assertOk();
+
+    expect($works($stolen))->toBeFalse()
+        ->and($works($own))->toBe($self)
+        ->and($works($colleagues))->toBeTrue();
+})->with(['by themselves' => true, 'by a colleague' => false]);
+
 it('gives a guard no e-mail address or password', function (string $field, string $value, string $message): void {
     $site = Site::factory()->create();
     $guard = User::factory()->create();
