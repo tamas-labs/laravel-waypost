@@ -133,11 +133,15 @@ final class WaypostServiceProvider extends ServiceProvider
         RateLimiter::for('waypost-pin', fn (Request $request): Limit => Limit::perMinute((int) config('waypost.rate_limits.pin'))
             ->by(self::rateLimitKey($request)));
 
-        RateLimiter::for('waypost-login', function (Request $request): Limit {
+        // Per address and IP against guessing one password; per IP against trying a few passwords on many addresses.
+        RateLimiter::for('waypost-login', function (Request $request): array {
             $email = $request->input('email');
 
-            return Limit::perMinute((int) config('waypost.rate_limits.login'))
-                ->by('waypost-login|' . Str::lower(is_string($email) ? $email : '') . '|' . $request->ip());
+            return [
+                Limit::perMinute((int) config('waypost.rate_limits.login'))
+                    ->by('waypost-login|' . Str::lower(is_string($email) ? $email : '') . '|' . $request->ip()),
+                Limit::perMinute((int) config('waypost.rate_limits.login_ip'))->by('waypost-login-ip|' . $request->ip()),
+            ];
         });
     }
 

@@ -54,7 +54,8 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 |---|---|---|
 | `WAYPOST_ROUTE_PREFIX` | `api/waypost/v1` | az API útvonalainak előtagja |
 | `WAYPOST_RATE_LIMIT` | `240` | kérés percenként, tokentulajdonosonként |
-| `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, e-mail-címenként és IP-címenként |
+| `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, ugyanarra az e-mail-címre ugyanarról az IP-címről |
+| `WAYPOST_LOGIN_IP_RATE_LIMIT` | `30` | belépési kísérlet percenként, IP-címenként, bármelyik e-mail-címre |
 | `WAYPOST_PIN_RATE_LIMIT` | `20` | PIN-t adó kérés (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) percenként, tokentulajdonosonként; mindegyik a telephelyek minden felhasználójára újraszámolja a PIN-t |
 | `WAYPOST_TABLE_PREFIX` | `waypost_` | a csomag tábláinak előtagja; csak az első migráció előtt változtasd |
 | `WAYPOST_DISK` | `local` | a fotók és a PDF-jelentések tárhelye; privát disk legyen |
@@ -66,6 +67,7 @@ Az útvonalak a `waypost.route.middleware` middleware-jeivel futnak, ez alapból
 
 ## Üzemeltetés
 
+- **Proxy mögött** (terheléselosztó, CDN) a gazda `TrustProxies` middleware-jében meg kell bízni a proxyban, különben a belépési korlát IP-címe a proxyé: egyetlen felhasználó hibás próbálkozásai is mindenki belépését megfoghatják.
 - **A telephelyi telefon tokenje a telephely kulcsa.** A PIN-t a telefon ellenőrzi, offline. Az `X-Acting-User` fejlécben kapott supervisorról a szerver csak azt nézi meg, hogy aktív-e, és hozzá van-e rendelve a telephelyhez. Aki a telefon tokenjét megszerzi, a telephelyen bármelyik supervisor nevében eljárhat: felhasználót (jelszavas supervisort is), pontot, útvonalat és menetrendet hozhat létre, módosíthat vagy törölhet, de csak ezen a telephelyen. Az elveszett vagy ellopott telefont ezért azonnal le kell váltani: egy új telefon hozzárendelése (`POST /devices/enroll`) a telephely régi telefonját visszavonja.
 
 ## Az API röviden

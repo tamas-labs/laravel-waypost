@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
 use Waypost\Models\PersonalAccessToken;
 use Waypost\Models\User;
@@ -74,6 +76,23 @@ it('refuses wrong credentials and guards the same way', function (array $body): 
     'guard with a password' => [['email' => 'kiss.peter@example.com', 'password' => 'password']],
 ]);
 
+it('hashes the password also when there is none to check, so that the time tells nothing', function (string $email): void {
+    supervisor();
+    User::factory()->supervisor()->create(['email' => 'jelszo.nelkul@example.com', 'password' => null]);
+    User::factory()->create(['email' => 'kiss.peter@example.com', 'password' => 'password']);
+    $hasher = Mockery::spy(Hasher::class);
+    Hash::swap($hasher);
+
+    login(['email' => $email, 'password' => 'password', 'device_name' => 'Pixel 8'])->assertUnauthorized();
+
+    $hasher->shouldHaveReceived('make')->once()->with('password');
+    $hasher->shouldNotHaveReceived('check');
+})->with([
+    'unknown address' => ['senki@example.com'],
+    'guard with a password' => ['kiss.peter@example.com'],
+    'supervisor without a password' => ['jelszo.nelkul@example.com'],
+]);
+
 it('refuses an inactive supervisor with the right password', function (): void {
     supervisor()->update(['active' => false]);
 
@@ -117,6 +136,21 @@ it('limits the attempts per address', function (): void {
 
     expect($response->json('error.code'))->toBe('rate_limited');
     login(['email' => 'masik@example.com', 'password' => 'wrong', 'device_name' => 'Pixel 8'])->assertUnauthorized();
+});
+
+it('limits the attempts per IP address, whatever the address', function (): void {
+    config(['waypost.rate_limits.login_ip' => 3]);
+    supervisor();
+
+    foreach (['a', 'b', 'c'] as $name) {
+        login(['email' => "{$name}@example.com", 'password' => 'wrong', 'device_name' => 'Pixel 8'])->assertUnauthorized();
+    }
+    $response = login(['email' => 'nagy.anna@example.com', 'password' => 'password', 'device_name' => 'Pixel 8'])
+        ->assertTooManyRequests()->assertHeader('Retry-After');
+
+    expect($response->json('error.code'))->toBe('rate_limited');
+    postJson('api/waypost/v1/auth/login', ['email' => 'nagy.anna@example.com', 'password' => 'password', 'device_name' => 'Pixel 8'], ['REMOTE_ADDR' => '10.0.0.2'])
+        ->assertOk();
 });
 
 it('deletes the token of the request on logout', function (): void {

@@ -271,6 +271,7 @@ Nincs ilyen megállapítás.
   - egy második, IP-re szóló login-limit;
   - a README-ben a `TrustProxies` megemlítése.
 - **Bizonyosság:** magas az időzítési különbségre; nem mértem.
+- **Állapot:** javítva (2026-11-05): ha nincs ellenőrizhető jelszó (ismeretlen cím, őr, jelszó nélküli supervisor), a szerver a beírt jelszót egyszer hasheli, ami ugyanannyi idő, mint egy ellenőrzés. A `waypost-login` az e-mail-cím és IP páros mellett IP-címre is korlátoz (`WAYPOST_LOGIN_IP_RATE_LIMIT`, alapból 30/perc). A `TrustProxies` a README *Üzemeltetés* fejezetében. Az időzítést nem mértem; a teszt azt ellenőrzi, hogy minden ágon pontosan egy hash-művelet fut. Teszt: `LoginTest`; döntés: `docs/decisions.md` (Belépés és kijelentkezés / Időzítés és jelszópróbálgatás).
 
 ### WP-BE-013 – A gyalogidőknek nincs felső határa a sémában, a túl nagy érték 500-at ad 422 helyett
 

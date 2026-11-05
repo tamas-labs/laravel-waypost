@@ -21,13 +21,22 @@ final class AuthController
      * A non-expiring supervisor token (api/auth-login.response). Guards have no password login; an unknown
      * address, a guard and a wrong password get the same answer.
      *
+     * Also in the time it takes: without a password to check, the password is hashed instead, which costs as much as
+     * a check with the same hasher. Otherwise the quicker answer would tell which addresses have an account.
+     *
      * @return array{token: string, user: array{id: string, name: string, email: string|null, role: string}}
      */
     public function login(Request $request): array
     {
         $email = Str::lower($request->string('email')->toString());
+        $password = $request->string('password')->toString();
         $user = User::query()->where('email', $email)->where('role', Role::Supervisor)->first();
-        if ($user?->password === null || !Hash::check($request->string('password')->toString(), $user->password)) {
+        if ($user?->password === null) {
+            Hash::make($password);
+
+            throw new ApiException(ErrorCode::Unauthenticated, 'Hibás e-mail-cím vagy jelszó.');
+        }
+        if (!Hash::check($password, $user->password)) {
             throw new ApiException(ErrorCode::Unauthenticated, 'Hibás e-mail-cím vagy jelszó.');
         }
         if (!$user->active) {
