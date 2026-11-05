@@ -544,6 +544,7 @@ Nincs ilyen megállapítás.
   - vagy objektumként dekódolni (`json_decode` `stdClass`-ra) a lenyomat számításához;
   - tesztvektor `{}`-ra és egy ékezetes kulcsra.
 - **Bizonyosság:** magas a viselkedésre; a mai hatás nulla.
+- **Állapot:** dokumentálva (2026-11-05): a mai sémák mellett nem hiba, a `waypost-schema` döntése rögzíti (ASCII kulcsok, nincs hash-elt üres objektum). A `docs/decisions.md` (A push feldolgozása / A kanonikus JSON határai) leírja, mi kell egy ilyen payload bevezetése előtt. Kódváltozás nincs.
 
 ### WP-BE-031 – A telephelyi telefon megkapja a PIN-hasheket, amelyek offline visszafejthetők (a specifikáció előírása)
 
