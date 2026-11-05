@@ -1,0 +1,20 @@
+# What a host gets from a dist archive (composer require from a vcs repository): the package, without the
+# development files.
+* text=auto eol=lf
+
+/.editorconfig export-ignore
+/.gitattributes export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/.waypost-schema-version export-ignore
+/CLAUDE.md export-ignore
+/compose.yaml export-ignore
+/docker export-ignore
+/docs export-ignore
+/phpstan.neon.dist export-ignore
+/phpunit.xml.dist export-ignore
+/pint.json export-ignore
+/scripts export-ignore
+/testbench.yaml export-ignore
+/tests export-ignore
+/workbench export-ignore

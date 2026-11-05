@@ -2,7 +2,18 @@
     "name": "waypost/laravel-waypost",
     "description": "Waypost backend as a Laravel package: guard patrol rounds, chained device log, sync API, reports.",
     "type": "library",
+    "keywords": ["laravel", "waypost", "guard-patrol", "offline-sync"],
+    "homepage": "https://github.com/tamas-labs/laravel-waypost",
     "license": "proprietary",
+    "authors": [
+        {
+            "name": "Tamas Balint"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/tamas-labs/laravel-waypost/issues",
+        "source": "https://github.com/tamas-labs/laravel-waypost"
+    },
     "require": {
         "php": "^8.4",
         "dompdf/dompdf": "^3.1",
