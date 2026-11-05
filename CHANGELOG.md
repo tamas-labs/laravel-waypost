@@ -37,6 +37,7 @@ A 2026-11-05-i audit javításai (`docs/AUDIT-ISSUES.md`, WP-BE-001 – WP-BE-02
 - Egy push a korábbi pushok alkalmazatlan bejegyzéseiből legfeljebb 500-at próbál újra, a hiányzó fotók listája is legfeljebb 500 elemű (WP-BE-018).
 - A pull két lépésben tölt be (előbb a kulcsok, aztán csak a lap rekordjai a kapcsolataikkal) (WP-BE-021).
 - A jelentés egy lekérdezéssel olvassa a megőrzési időt; a `Summarizer` a várt köröket az `ExpectedRounds`-ból, a körsorokat a `RoundRows`-ból kapja (WP-BE-025, WP-BE-026).
+- A lemondott jelentés-előfizetés a lemondás után még a saját megőrzési idejéig (havinál 62 nap) számít a megőrzésbe, így a havi jelentés lemondása nem törli azonnal a 31–62 napos adatot (WP-BE-039).
 - A PIN-hozzárendelés zárolja az érintett telephelyeket a mentés commitjáig, így két egyidejű kérés nem adhatja ugyanazt a PIN-t (WP-BE-010).
 - Index minden idegen kulcson PostgreSQL-en és SQLite-on is (új migráció; MySQL-en nem változik semmi) (WP-BE-006).
 - MIT licenc (`LICENSE`, a `composer.json`-ban eddig „proprietary”) (WP-BE-024).

@@ -157,6 +157,28 @@ it('refuses an expired or changed report link, and a file that is gone', functio
     get($download['url'])->assertForbidden();
 });
 
+it('keeps the retention of a cancelled subscription for that long after the cancellation', function (): void {
+    travelTo(CarbonImmutable::parse('2026-11-05T12:00:00Z'));
+    $site = Site::factory()->create();
+    $monthly = ReportSubscription::factory()->create(['site_id' => $site->id, 'frequency' => ReportFrequency::Monthly]);
+    $weekly = ReportSubscription::factory()->create(['site_id' => $site->id, 'frequency' => ReportFrequency::Weekly]);
+    // Another site's subscription is not this one's.
+    ReportSubscription::factory()->create(['frequency' => ReportFrequency::Monthly]);
+    expect(Retention::days($site))->toBe(62);
+
+    $monthly->delete();
+    $weekly->delete();
+    // The data recorded under the monthly report stays its 62 days: until 2027-01-06 12:00.
+    travelTo(CarbonImmutable::parse('2027-01-06T11:59:59Z'));
+    expect(Retention::days($site))->toBe(62);
+    travelTo(CarbonImmutable::parse('2027-01-06T12:00:00Z'));
+    expect(Retention::days($site))->toBe(31);
+
+    // A new subscription counts at once.
+    ReportSubscription::factory()->create(['site_id' => $site->id, 'frequency' => ReportFrequency::Monthly]);
+    expect(Retention::days($site))->toBe(62);
+});
+
 it('signs a photo until the end of the data retention', function (): void {
     $site = Site::factory()->create();
     $photo = storedPhoto('2026-11-02T21:03:44.120Z');

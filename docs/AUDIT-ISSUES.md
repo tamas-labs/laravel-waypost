@@ -654,6 +654,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Nem sérül; üzleti döntést igényel, ezért nem találtam ki szabályt.
 - **Javítási irány:** Termékdöntés: türelmi idő (a megőrzés a lemondás után még egy időszakig a régi), vagy a felületen figyelmeztetés.
 - **Bizonyosság:** magas.
+- **Állapot:** javítva (2026-11-05, a tulajdonos döntése: türelmi idő): a `Retention::days()` a lemondott (soft delete-tel törölt) előfizetést a lemondás után még a saját megőrzési idejéig számítja (havinál 62, hetinél 14 nap). Teszt: `ReportsTest`; döntés: `docs/decisions.md` (Aláírt URL-ek / Megőrzési idő / Türelmi idő); a specifikáció és az app teendője a `docs/AUDIT-OTHER-REPOS.md`-ben.
 
 ### WP-BE-040 – Az inaktív fiók külön üzenete a helyes jelszó megerősítése
 
