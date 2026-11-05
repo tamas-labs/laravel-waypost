@@ -402,6 +402,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Audit szempont: *Teljesítmény*. A specifikáció 500-as lapot ír elő, ezt a kód betartja.
 - **Javítási irány:** Először csak a kulcsok (`updated_at`, `id`) és a méretek olvasása, a lapra kerülő rekordok teljes betöltése ezután.
 - **Bizonyosság:** közepes.
+- **Állapot:** javítva (2026-11-05): a `Pull` először csak a jelöltek kulcsát és méretét olvassa (`id`, változási idő, az útvonalverzió pontjainak száma `withCount`-tal). Utána csak a lapra kerülő rekordokat tölti be egészen, a felhasználót a telephelyeivel, a verziót a pontjaival. Teszt: `SyncPullTest` (a lapon kívüli verzió pontjai nem töltődnek be); döntés: `docs/decisions.md` (A pull / Betöltés).
 
 ### WP-BE-022 – A pull `SETTLE_MS` várakozása feltételezés, nem garancia
 

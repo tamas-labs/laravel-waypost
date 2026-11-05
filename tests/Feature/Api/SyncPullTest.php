@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
 use Waypost\Models\Checkpoint;
 use Waypost\Models\Device;
@@ -260,16 +261,24 @@ it('never splits a route version from its checkpoints', function (): void {
     }
     settle();
 
+    // Only the records of the page are loaded whole: the version's checkpoints only with the version.
+    $loadedPoints = 0;
+    Event::listen('eloquent.retrieved: ' . RouteVersionCheckpoint::class, function () use (&$loadedPoints): void {
+        $loadedPoints++;
+    });
+
     // site, phone, route and 494 checkpoints: 497; the version with its 4 checkpoints would make 502.
     $first = pullAs($phone)->assertOk();
     expect($first->json('has_more'))->toBeTrue();
     expect(recordCount($first))->toBe(497);
     expect(changed($first, 'route_versions'))->toBe([]);
+    expect($loadedPoints)->toBe(0);
 
     $second = pullAs($phone, $first->json('cursor'))->assertOk();
     expect($second->json('has_more'))->toBeFalse();
     expect(changed($second, 'route_versions'))->toBe([$version->id]);
     expect($second->json('changes.route_version_checkpoints.*.position'))->toBe([1, 2, 3, 4]);
+    expect($loadedPoints)->toBe(4);
 });
 
 it('starts again from the full state when the supervisor\'s sites change', function (): void {

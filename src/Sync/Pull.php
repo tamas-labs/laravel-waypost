@@ -57,6 +57,9 @@ final class Pull
         'report_subscriptions' => 'updated_at',
     ];
 
+    /** What the records of a list are loaded with once they are on the page. */
+    private const array RELATIONS = ['users' => ['sites'], 'route_versions' => ['points']];
+
     /** The lists of "deleted": route versions are never deleted on their own, and sites go with a reset. */
     private const array DELETED = ['sites', 'users', 'devices', 'checkpoints', 'routes', 'schedules', 'report_subscriptions'];
 
@@ -77,17 +80,22 @@ final class Pull
         }
         $until = Time::now()->subMilliseconds(self::SETTLE_MS);
 
+        // First only the keys and the sizes of the candidates (each table's next PAGE_SIZE + 1), then the whole records
+        // of those that make the page: the others are not loaded, nor their checkpoints and sites.
+        $queries = $this->queries($caller, $siteIds);
         $candidates = [];
-        foreach ($this->queries($caller, $siteIds) as $list => $query) {
+        foreach ($queries as $list => $query) {
             $key = self::KEYS[$list];
-            $records = $query
+            $keys = (clone $query)
+                ->select($query->qualifyColumns(['id', $key]))
+                ->when($list === 'route_versions', fn (Builder $versions) => $versions->withCount('points'))
                 ->whereRowValues($query->qualifyColumns([$key, 'id']), '>', [$from->time->format(Time::DATABASE_FORMAT), $from->id])
                 ->where($query->qualifyColumn($key), '<=', $until->format(Time::DATABASE_FORMAT))
                 ->orderBy($query->qualifyColumn($key))
                 ->orderBy($query->qualifyColumn('id'))
                 ->limit(self::PAGE_SIZE + 1)
                 ->get();
-            foreach ($records as $record) {
+            foreach ($keys as $record) {
                 $changed = $record->getAttribute($key);
                 if (!$changed instanceof DateTimeInterface) {
                     throw new LogicException("A synced record has its {$key}.");
@@ -97,30 +105,44 @@ final class Pull
                     'order' => $time->format(Time::DATABASE_FORMAT) . ' ' . $record->getKey(),
                     'time' => $time,
                     'list' => $list,
-                    'record' => $record,
-                    'size' => $record instanceof RouteVersion ? 1 + $record->points->count() : 1,
+                    'id' => (string) $record->getKey(),
+                    'size' => 1 + (int) $record->getAttribute('points_count'),
                 ];
             }
         }
         usort($candidates, fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+
+        $page = [];
+        $records = 0;
+        foreach ($candidates as $candidate) {
+            if ($records > 0 && $records + $candidate['size'] > self::PAGE_SIZE) {
+                break;
+            }
+            $records += $candidate['size'];
+            $page[] = $candidate;
+        }
+        $loaded = [];
+        foreach (array_unique(array_column($page, 'list')) as $list) {
+            $loaded[$list] = (clone $queries[$list])
+                ->with(self::RELATIONS[$list] ?? [])
+                ->whereKey(array_column(array_filter($page, fn (array $candidate): bool => $candidate['list'] === $list), 'id'))
+                ->get()
+                ->keyBy(fn (Model $record): string => (string) $record->getKey());
+        }
 
         $lists = array_keys(self::KEYS);
         array_splice($lists, array_search('route_versions', $lists, true) + 1, 0, ['route_version_checkpoints']);
         $changes = array_fill_keys($lists, []);
         $deleted = array_fill_keys(self::DELETED, []);
         $last = $from;
-        $taken = 0;
-        $records = 0;
-        foreach ($candidates as $candidate) {
-            if ($records > 0 && $records + $candidate['size'] > self::PAGE_SIZE) {
-                break;
-            }
-            $taken++;
-            $records += $candidate['size'];
-            $last = new PullCursor($candidate['time'], (string) $candidate['record']->getKey(), $scope);
-
-            $record = $candidate['record'];
+        foreach ($page as $candidate) {
+            $last = new PullCursor($candidate['time'], $candidate['id'], $scope);
             $list = $candidate['list'];
+            $record = $loaded[$list][$candidate['id']] ?? null;
+            if ($record === null) {
+                // Gone since the first query; config records are only soft deleted, so this is the odd one out.
+                continue;
+            }
             if ($this->sees($caller, $siteIds, $record)) {
                 $changes[$list][] = $this->entity($caller, $record);
                 if ($record instanceof RouteVersion) {
@@ -134,7 +156,7 @@ final class Pull
 
         return [
             'cursor' => $last->encode(),
-            'has_more' => $taken < count($candidates),
+            'has_more' => count($page) < count($candidates),
             'reset' => $reset,
             'changes' => $changes,
             'deleted' => $deleted,
@@ -142,7 +164,7 @@ final class Pull
     }
 
     /**
-     * The records each list may hold: those of the caller's sites, deleted ones included.
+     * The records each list may hold: those of the caller's sites, deleted ones included (without RELATIONS).
      *
      * @param  list<string>  $siteIds
      * @return array<string, Builder<covariant Model>>
@@ -153,7 +175,7 @@ final class Pull
 
         return [
             'sites' => Site::query()->whereKey($siteIds),
-            'users' => User::withTrashed()->with('sites')->where(function (Builder $users) use ($siteIds, $self): void {
+            'users' => User::withTrashed()->where(function (Builder $users) use ($siteIds, $self): void {
                 $users->whereHas('sites', fn (Builder $sites) => $sites->whereKey($siteIds))
                     ->orWhereIn('id', DB::table(Table::name('site_user_detachments'))->whereIn('site_id', $siteIds)->select('user_id'));
                 if ($self !== null) {
@@ -163,7 +185,7 @@ final class Pull
             'devices' => Device::withTrashed()->whereIn('site_id', $siteIds),
             'checkpoints' => Checkpoint::withTrashed()->whereIn('site_id', $siteIds),
             'routes' => Route::withTrashed()->whereIn('site_id', $siteIds),
-            'route_versions' => RouteVersion::query()->with('points')
+            'route_versions' => RouteVersion::query()
                 ->whereIn('route_id', Route::query()->whereIn('site_id', $siteIds)->select('id')),
             'schedules' => Schedule::withTrashed()
                 ->whereIn('route_id', Route::withTrashed()->whereIn('site_id', $siteIds)->select('id')),
