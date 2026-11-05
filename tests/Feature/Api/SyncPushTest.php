@@ -5,11 +5,13 @@ declare(strict_types=1);
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Waypost\Chain\ChainProcessor;
 use Waypost\Chain\EntryHash;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
 use Waypost\Models\Device;
 use Waypost\Models\Incident;
+use Waypost\Models\Media;
 use Waypost\Models\Shift;
 use Waypost\Support\Time;
 use Waypost\Support\Uuid;
@@ -182,6 +184,44 @@ it('keeps a push whose entry cannot be applied, and applies that entry on a late
 
     expect(ChainEntry::query()->whereNull('projected_at')->count())->toBe(0)
         ->and(Incident::query()->count())->toBe(3);
+});
+
+it('tries at most PENDING_LIMIT unapplied entries of earlier pushes, but always the ones it accepts now', function (): void {
+    $device = Device::factory()->create();
+    $chain = new ChainBuilder($device);
+    $shiftId = Uuid::v7();
+    $earlier = [];
+    foreach (range(1, ChainProcessor::PENDING_LIMIT + 2) as $seq) {
+        $entry = ChainEntry::fromPush($earlier[] = $chain->incident($shiftId));
+        $entry->fill(['received_at' => Time::now(), 'verify_status' => VerifyStatus::Ok, 'flags' => []])->save();
+    }
+    $device->update(['last_seq' => $chain->seq, 'last_hash' => $chain->lastHash]);
+    // The shift these incidents wait for arrives (here with one of their entries as its own).
+    Shift::factory()->create(['id' => $shiftId, 'device_id' => $device->id, 'chain_entry_id' => $earlier[0]['id']]);
+    $now = $chain->incident($shiftId);
+
+    pushAs($device, [$now])->assertOk();
+
+    expect(ChainEntry::query()->whereNull('projected_at')->orderBy('seq')->pluck('seq')->all())
+        ->toBe([ChainProcessor::PENDING_LIMIT + 1, ChainProcessor::PENDING_LIMIT + 2]);
+
+    pushAs($device, [$now])->assertOk();
+
+    expect(ChainEntry::query()->whereNull('projected_at')->count())->toBe(0)
+        ->and(Incident::query()->count())->toBe(count($earlier) + 1);
+});
+
+it('lists at most MEDIA_MISSING_LIMIT missing photos, the oldest first', function (): void {
+    $device = Device::factory()->create();
+    $ids = [];
+    foreach (range(1, ChainProcessor::MEDIA_MISSING_LIMIT + 1) as $photo) {
+        $ids[] = Media::factory()->create(['id' => Uuid::v7(), 'device_id' => $device->id, 'owner_id' => Uuid::v7()])->id;
+    }
+    [, $entries] = chainOf($device, 1);
+
+    $response = pushAs($device, $entries)->assertOk();
+
+    expect($response->json('media_missing'))->toBe(array_slice($ids, 0, ChainProcessor::MEDIA_MISSING_LIMIT));
 });
 
 it('takes the waiting entries in turn when the batch itself fills the gap between them', function (): void {

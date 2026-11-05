@@ -363,6 +363,7 @@ Nincs ilyen megállapítás.
   - a vissza nem térő hivatkozású bejegyzések (pl. N próbálkozás vagy nap után) jelölése és kizárása;
   - a `chain_entries (device_id, projected_at)` index már megvan.
 - **Bizonyosság:** magas a mintára, alacsony a gyakorlati hatásra.
+- **Állapot:** javítva (2026-11-05): egy push a most elfogadott bejegyzéseket mindig megpróbálja, a korábbiak alkalmazatlan bejegyzéseiből legfeljebb 500-at (`ChainProcessor::PENDING_LIMIT`), a legrégebbiekkel kezdve. A `media_missing` legfeljebb 500 elemű (`MEDIA_MISSING_LIMIT`), a legrégebbi fotókkal kezdve. Az app ezeket a saját feltöltetlen fotói mellé veszi (`src/sync/media.ts`), ezért a lista csonkolása csak késlelteti a többit. A soha nem alkalmazható bejegyzést az adatmegőrzés viszi el, így próbálkozásszámláló oszlop nem kellett. Teszt: `SyncPushTest`; döntés: `docs/decisions.md` (Halasztott vetület / Korlát; A push feldolgozása / Listák).
 
 ### WP-BE-019 – Az ütemezett jobok egyszerre több szerveren, és egymást átfedve is futhatnak
 

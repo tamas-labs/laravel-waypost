@@ -32,6 +32,16 @@ use Waypost\Support\Time;
  */
 final readonly class ChainProcessor
 {
+    /**
+     * Unapplied entries of earlier pushes tried again in one push, the oldest first; the entries accepted now are
+     * always tried. A phone that worked offline on a route the server does not know yet may have thousands, and every
+     * batch of its sync would try all of them again, in the locked transaction.
+     */
+    public const int PENDING_LIMIT = 500;
+
+    /** Photos listed in media_missing, the oldest first: the app uploads them, the next push lists the rest. */
+    public const int MEDIA_MISSING_LIMIT = 500;
+
     public function __construct(private Projector $projector)
     {
     }
@@ -51,11 +61,12 @@ final readonly class ChainProcessor
             }
 
             $result = new PushResult();
+            $lastSeq = $device->last_seq;
             $incoming = array_flip(array_map(fn (array $entry): int => (int) $entry['seq'], $entries));
             foreach ($entries as $data) {
                 $this->receive($device, ChainEntry::fromPush($data), $incoming, $result);
             }
-            $this->projectPending($device);
+            $this->projectPending($device, $lastSeq);
 
             // Without updated_at: the chain state is no change for the pull.
             $device->timestamps = false;
@@ -199,20 +210,26 @@ final readonly class ChainProcessor
     }
 
     /**
-     * Everything accepted and not applied yet, also from earlier pushes: what it refers to may be here by now.
+     * Everything accepted now, and at most PENDING_LIMIT entries of earlier pushes not applied yet: what they refer to
+     * may be here by now. An honest phone's entry waits only for configuration that comes later, so the rest follows
+     * with the next pushes; one that can never be applied goes with the retention.
      *
      * Each entry in its own savepoint: one that fails (a database error, a value the column does not take) is logged and
      * stays unapplied, and the push still commits what it received. Otherwise the entry would roll back every later push
      * of the device too, and its data would stay on the phone.
+     *
+     * @param  int  $lastSeq  the device's last_seq before this push
      */
-    private function projectPending(Device $device): void
+    private function projectPending(Device $device, int $lastSeq): void
     {
-        ChainEntry::query()
+        $pending = fn () => ChainEntry::query()
             ->where('device_id', $device->id)
             ->where('verify_status', VerifyStatus::Ok)
             ->whereNull('projected_at')
-            ->orderBy('seq')
-            ->get()
+            ->orderBy('seq');
+
+        $pending()->where('seq', '<=', $lastSeq)->limit(self::PENDING_LIMIT)->get()
+            ->concat($pending()->where('seq', '>', $lastSeq)->get())
             ->each(function (ChainEntry $entry) use ($device): void {
                 try {
                     DB::transaction(function () use ($device, $entry): void {
@@ -233,7 +250,7 @@ final readonly class ChainProcessor
     {
         return array_values(array_map(
             strval(...),
-            Media::query()->where('device_id', $device->id)->whereNull('uploaded_at')->orderBy('id')->pluck('id')->all(),
+            Media::query()->where('device_id', $device->id)->whereNull('uploaded_at')->orderBy('id')->limit(self::MEDIA_MISSING_LIMIT)->pluck('id')->all(),
         ));
     }
 }
