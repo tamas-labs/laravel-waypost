@@ -209,6 +209,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Specifikáció, *Szerveroldali ellenőrzés* (a bejegyzés eltárolódik, a vetület idempotens), M4.
 - **Javítási irány:** Bejegyzésenként savepoint a `projectPending()`-ben. Kivételnél a bejegyzés maradjon `projected_at = null`, és kapjon naplót vagy diagnosztikai jelzést, de a lánc fogadása commitoljon.
 - **Bizonyosság:** közepes (a mechanizmus igazolt; konkrét, sémán átjutó kiváltó okot nem találtam, csak a WP-BE-013 szomszédos esetét).
+- **Állapot:** javítva (2026-11-05): a `projectPending()` minden bejegyzést saját savepointban alkalmaz. Ha egy bejegyzés kivételt dob, `Log::error` kerül a naplóba (eszköz, bejegyzés, `seq`), a bejegyzés vetület nélkül marad (`projected_at = null`), és a következő push újrapróbálja; a push fogadása commitol. Teszt: `SyncPushTest`; döntés: `docs/decisions.md` (Halasztott vetület / Hibás bejegyzés).
 
 ### WP-BE-009 – Az X-Acting-User mögött nincs szerveroldali bizonyíték: az eszköztoken birtokosa a telephely bármelyik supervisoraként eljárhat
 

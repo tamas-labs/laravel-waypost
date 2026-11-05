@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Waypost\Chain\EntryHash;
 use Waypost\Enums\VerifyStatus;
@@ -153,6 +154,34 @@ it('fills a gap: 1, 2, 4, 5, then 3 makes all of them ok and the projection comp
         ->and(ChainEntry::query()->whereNull('projected_at')->count())->toBe(0)
         ->and(Incident::query()->count())->toBe(4)
         ->and($device->refresh()->last_hash)->toBe($entries[4]['hash']);
+});
+
+it('keeps a push whose entry cannot be applied, and applies that entry on a later push', function (): void {
+    $device = Device::factory()->create();
+    [$chain, $entries] = chainOf($device, 3);
+    $log = Log::spy();
+    $failed = false;
+    Incident::creating(function () use (&$failed): void {
+        if (!$failed) {
+            $failed = true;
+
+            throw new RuntimeException('The disk is full.');
+        }
+    });
+
+    $first = pushAs($device, $entries)->assertOk();
+
+    expect($first->json())->toMatchArray(['accepted' => idsOf($entries), 'last_seq' => 3, 'rejected' => []])
+        ->and(ChainEntry::query()->whereNull('projected_at')->pluck('seq')->all())->toBe([2])
+        ->and(Incident::query()->count())->toBe(1);
+    $log->shouldHaveReceived('error')->once()->withArgs(
+        fn (string $message, array $context): bool => $context['entry_id'] === $entries[1]['id'] && $context['seq'] === 2,
+    );
+
+    pushAs($device, [$chain->incident($entries[0]['payload']['shift_id'])])->assertOk();
+
+    expect(ChainEntry::query()->whereNull('projected_at')->count())->toBe(0)
+        ->and(Incident::query()->count())->toBe(3);
 });
 
 it('takes the waiting entries in turn when the batch itself fills the gap between them', function (): void {

@@ -327,6 +327,7 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - **A fotó helyőrző sora** a bejegyzés elfogadásakor akkor is létrejön, ha a bejegyzés még nem alkalmazható, mert az app a push után rögtön feltölti a fotót. A `taken_at` a bejegyzés `device_time`-ja, amíg a feltöltés a pontos értéket nem hozza.
   - **Ismert korlát:** a halasztott bejegyzés csak a következő pushnál kerül vetületbe, addig a jelentésből hiányzik. Az M6-nak a `projected_at = null` sorokat a „nem teljes adat” jelzésbe kell számolnia.
   - Az időpontok az app `entryTrustedTime` számítása szerint (`Waypost\Chain\TrustedTime`).
+  - **Hibás bejegyzés** (2026-11-05, WP-BE-008): minden bejegyzés saját savepointban kerül vetületbe. Ha egy bejegyzés kivételt dob (adatbázishiba, az oszlopba nem férő érték), `Log::error` kerül a naplóba (eszköz, bejegyzés, `seq`), és a bejegyzés vetület nélkül marad, mint az ismeretlen hivatkozásnál. A push a fogadott bejegyzésekkel commitol, a következő push újrapróbálja. Különben egyetlen ilyen bejegyzés az eszköz minden további pushát 500-zal visszagörgetné, és az adat a telefonon maradna.
 - **Indok:** Egy érvényes, aláírt bejegyzés sosem veszhet el és nem akaszthatja meg a szinkront; a külön újrapróbáló job helyett a következő push elég, mert az app előtérben 5 percenként szinkronizál.
 - **Érintett:** `src/Chain/Projector.php`, `TrustedTime.php`, `ChainProcessor.php`, `database/migrations/…_chain_entries_table.php`, M4-05, M5-02, M6-05.
 

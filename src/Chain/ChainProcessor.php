@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Waypost\Chain;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\ErrorCode;
 use Waypost\Enums\VerifyStatus;
@@ -187,7 +189,13 @@ final readonly class ChainProcessor
         }
     }
 
-    /** Everything accepted and not applied yet, also from earlier pushes: what it refers to may be here by now. */
+    /**
+     * Everything accepted and not applied yet, also from earlier pushes: what it refers to may be here by now.
+     *
+     * Each entry in its own savepoint: one that fails (a database error, a value the column does not take) is logged and
+     * stays unapplied, and the push still commits what it received. Otherwise the entry would roll back every later push
+     * of the device too, and its data would stay on the phone.
+     */
     private function projectPending(Device $device): void
     {
         ChainEntry::query()
@@ -197,8 +205,16 @@ final readonly class ChainProcessor
             ->orderBy('seq')
             ->get()
             ->each(function (ChainEntry $entry) use ($device): void {
-                if ($this->projector->apply($device, $entry)) {
-                    $entry->update(['projected_at' => Time::now()]);
+                try {
+                    DB::transaction(function () use ($device, $entry): void {
+                        if ($this->projector->apply($device, $entry)) {
+                            $entry->update(['projected_at' => Time::now()]);
+                        }
+                    });
+                } catch (Throwable $exception) {
+                    Log::error('Waypost: a chain entry could not be applied; it stays unapplied.', [
+                        'device_id' => $device->id, 'entry_id' => $entry->id, 'seq' => $entry->seq, 'exception' => $exception,
+                    ]);
                 }
             });
     }
