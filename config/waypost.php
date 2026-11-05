@@ -15,6 +15,13 @@ return [
     ],
 
     /*
+    | Name of the package's auth guard (its own token table). The package adds it to auth.guards; if the
+    | host application has a guard of this name already, the application stops with an error: pick
+    | another name here instead of losing the host's guard.
+    */
+    'guard' => env('WAYPOST_GUARD', 'waypost'),
+
+    /*
     | Rate limits of the API, in requests per minute: "api" per token owner (user or device), "login" per
     | e-mail address and IP address, "login_ip" per IP address (whatever the address tried; behind a proxy
     | the host's TrustProxies decides the IP), "pin" per token owner on the requests that give a PIN (each of them

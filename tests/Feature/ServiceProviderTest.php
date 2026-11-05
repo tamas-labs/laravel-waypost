@@ -43,3 +43,16 @@ it('runs its scheduled jobs on one server, and none of them twice at a time', fu
         expect($job)->toBeInstanceOf(ShouldBeUnique::class)->and($job->uniqueFor)->toBeGreaterThan(0);
     }
 });
+
+it('never replaces an auth guard of the application with its own', function (): void {
+    config(['auth.guards.waypost' => ['driver' => 'session', 'provider' => 'users']]);
+
+    expect(fn () => (new WaypostServiceProvider(app()))->register())->toThrow(LogicException::class, 'WAYPOST_GUARD');
+    expect(config('auth.guards.waypost'))->toBe(['driver' => 'session', 'provider' => 'users']);
+});
+
+it('registers its guard again over its own, as after config:cache', function (): void {
+    (new WaypostServiceProvider(app()))->register();
+
+    expect(config('auth.guards.waypost'))->toBe(['driver' => 'waypost']);
+});

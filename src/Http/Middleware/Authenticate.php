@@ -6,6 +6,7 @@ namespace Waypost\Http\Middleware;
 
 use Closure;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ use Waypost\Models\Device;
 use Waypost\Models\PersonalAccessToken;
 use Waypost\Models\User;
 use Waypost\Support\Uuid;
+use Waypost\WaypostServiceProvider;
 
 /**
  * Authenticates an API request with the "waypost" guard and attaches its Caller. The parameters are the callers
@@ -54,10 +56,13 @@ final readonly class Authenticate implements AuthenticatesRequests
     /** @param  Closure(Request): Response  $next */
     public function handle(Request $request, Closure $next, string ...$callers): Response
     {
-        $owner = $this->auth->guard('waypost')->user();
+        $guard = WaypostServiceProvider::guard();
+        // The package's TokenGuard: a User or a Device (Larastan cannot tell it from a name read from the config).
+        /** @var Authenticatable|null $owner */
+        $owner = $this->auth->guard($guard)->user();
         $token = $owner instanceof User || $owner instanceof Device ? $owner->currentAccessToken() : null;
         if (!$token instanceof PersonalAccessToken) {
-            throw new AuthenticationException('Unauthenticated.', ['waypost']);
+            throw new AuthenticationException('Unauthenticated.', [$guard]);
         }
 
         $caller = $owner instanceof Device

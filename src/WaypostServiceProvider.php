@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Route as Router;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Throwable;
+use LogicException;
 use Waypost\Auth\Caller;
 use Waypost\Auth\Gate;
 use Waypost\Auth\TokenGuard;
@@ -72,7 +73,13 @@ final class WaypostServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(self::CONFIG_FILE, 'waypost');
 
         // The guard of the package's tokens; Sanctum's "sanctum" guard reads the host application's token table.
-        config()->set('auth.guards.waypost', ['driver' => 'waypost']);
+        // Never in the place of a guard of the host (config:cache keeps the package's own, with its driver).
+        $guard = self::guard();
+        $existing = config("auth.guards.{$guard}");
+        if ($existing !== null && (!is_array($existing) || ($existing['driver'] ?? null) !== 'waypost')) {
+            throw new LogicException("The application has an auth guard named \"{$guard}\" already: set WAYPOST_GUARD (waypost.guard) to another name for the Waypost guard.");
+        }
+        config()->set("auth.guards.{$guard}", ['driver' => 'waypost']);
 
         $this->app->singleton(SchemaValidator::class);
         $this->app->singleton(
@@ -123,6 +130,14 @@ final class WaypostServiceProvider extends ServiceProvider
             ->middleware([FormatApiResponse::class, ...$middleware])
             ->name('waypost.')
             ->group($routes);
+    }
+
+    /** The name of the package's auth guard (waypost.guard). */
+    public static function guard(): string
+    {
+        $guard = config('waypost.guard');
+
+        return is_string($guard) && $guard !== '' ? $guard : 'waypost';
     }
 
     private function defineRateLimits(): void

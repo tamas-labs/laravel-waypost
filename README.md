@@ -57,6 +57,7 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 | `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, ugyanarra az e-mail-címre ugyanarról az IP-címről |
 | `WAYPOST_LOGIN_IP_RATE_LIMIT` | `30` | belépési kísérlet percenként, IP-címenként, bármelyik e-mail-címre |
 | `WAYPOST_PIN_RATE_LIMIT` | `20` | PIN-t adó kérés (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) percenként, tokentulajdonosonként; mindegyik a telephelyek minden felhasználójára újraszámolja a PIN-t |
+| `WAYPOST_GUARD` | `waypost` | a csomag auth guardjának neve; ha a gazdának már van ilyen nevű guardja, az alkalmazás hibával áll le, és itt más nevet kell adni |
 | `WAYPOST_TABLE_PREFIX` | `waypost_` | a csomag tábláinak előtagja; csak az első migráció előtt változtasd |
 | `WAYPOST_DISK` | `local` | a fotók és a PDF-jelentések tárhelye; privát disk legyen |
 | `WAYPOST_PULL_SETTLE_MS` | `5000` | ennyi ezredmásodpercig nem adja ki a pull a frissen változott rekordot, mert az író tranzakció még futhat; legyen több a leghosszabb tranzakciónál és az alkalmazásszerverek órájának eltérésénél |

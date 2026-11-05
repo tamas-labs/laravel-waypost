@@ -55,6 +55,16 @@ function expectError(TestResponse $response, int $status, string $code): void
     expect($response->json('error.code'))->toBe($code);
 }
 
+it('works under another guard name, next to a guard of the application named waypost', function (): void {
+    config(['auth.guards.waypost' => ['driver' => 'session', 'provider' => 'users'], 'waypost.guard' => 'waypost_api']);
+    (new WaypostServiceProvider(app()))->register();
+
+    expect(config('auth.guards.waypost_api'))->toBe(['driver' => 'waypost'])
+        ->and(config('auth.guards.waypost.driver'))->toBe('session');
+    callApi('GET', 'sites', supervisorOf(Site::factory()->create()))->assertOk();
+    getJson('api/waypost/v1/sites')->assertUnauthorized();
+});
+
 it('accepts a supervisor token where a supervisor may call', function (): void {
     $site = Site::factory()->create();
     $other = Site::factory()->create();

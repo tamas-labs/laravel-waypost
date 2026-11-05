@@ -492,6 +492,7 @@ Nincs ilyen megállapítás.
 - **Megsértett követelmény:** Specifikáció, *A csomag szabályai* (a gazda erőforrásainak érintetlensége); audit szempont: *Architektúra*.
 - **Javítási irány:** Ha a kulcs már létezik és más a drivere, kivétel vagy figyelmeztetés; vagy egy konfigurálható guardnév.
 - **Bizonyosság:** magas (kis valószínűség).
+- **Állapot:** javítva (2026-11-05): a guard neve a `waypost.guard` (`WAYPOST_GUARD`, alapból `waypost`). Ha a gazdának már van ilyen nevű, más driverű guardja, a service provider egyértelmű `LogicException`-nel áll le, és nem írja felül csendben. A saját, `waypost` driverű bejegyzést, például a `config:cache` után, elfogadja. Teszt: `ServiceProviderTest`, `AuthenticationTest` (más guardnévvel működik); döntés: `docs/decisions.md` (Azonosítás).
 
 ### WP-BE-028 – A README-ből hiányoznak üzemeltetési előfeltételek
 
