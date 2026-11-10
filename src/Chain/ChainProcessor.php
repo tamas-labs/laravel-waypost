@@ -33,9 +33,9 @@ use Waypost\Support\Time;
 final readonly class ChainProcessor
 {
     /**
-     * Unapplied entries of earlier pushes tried again in one push, the oldest first; the entries accepted now are
-     * always tried. A phone that worked offline on a route the server does not know yet may have thousands, and every
-     * batch of its sync would try all of them again, in the locked transaction.
+     * Unapplied entries of earlier pushes tried again in one push, in turn (devices.pending_cursor); the entries accepted
+     * now are always tried. A phone that worked offline on a route the server does not know yet may have thousands, and
+     * every batch of its sync would try all of them again, in the locked transaction.
      */
     public const int PENDING_LIMIT = 500;
 
@@ -223,8 +223,10 @@ final readonly class ChainProcessor
 
     /**
      * Everything accepted now, and at most PENDING_LIMIT entries of earlier pushes not applied yet: what they refer to
-     * may be here by now. An honest phone's entry waits only for configuration that comes later, so the rest follows
-     * with the next pushes; one that can never be applied goes with the retention.
+     * may be here by now. The earlier ones are taken in turn: from the seq after the one the last push stopped at
+     * (devices.pending_cursor), round again from the start when the end is reached. So within a few pushes each gets
+     * its try, even behind more than PENDING_LIMIT that can never be applied (those go with the retention); the oldest
+     * first every time would leave the later ones out for good.
      *
      * Each entry in its own savepoint: one that fails (a database error, a value the column does not take) is logged and
      * stays unapplied, and the push still commits what it received. Otherwise the entry would roll back every later push
@@ -242,7 +244,17 @@ final readonly class ChainProcessor
             ->whereNull('projected_at')
             ->orderBy('seq');
 
-        $pending()->where('seq', '<=', $lastSeq)->limit(self::PENDING_LIMIT)->get()
+        $earlier = $pending()->where('seq', '>', $device->pending_cursor)->where('seq', '<=', $lastSeq)->limit(self::PENDING_LIMIT)->get();
+        if ($earlier->count() < self::PENDING_LIMIT) {
+            $earlier = $earlier->concat(
+                $pending()->where('seq', '<=', min($device->pending_cursor, $lastSeq))->limit(self::PENDING_LIMIT - $earlier->count())->get(),
+            );
+        }
+        // Saved with the device at the end of the push.
+        $device->pending_cursor = $earlier->last()->seq ?? 0;
+
+        // In seq order, so an entry tried after a wrap still comes after what it may refer to in this push.
+        $earlier->sortBy('seq')
             ->concat($pending()->where('seq', '>', $lastSeq)->get())
             ->each(function (ChainEntry $entry) use ($device, $lastSeq, &$waiting): void {
                 try {

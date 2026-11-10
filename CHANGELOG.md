@@ -6,8 +6,16 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
+Egy új migráció (`devices.pending_cursor`): frissítés után `php artisan waypost:install --migrate`.
+
+### Fixed
+
+- A korábbi pushok alkalmazatlan bejegyzései sorban kerülnek újrapróbálásra (`devices.pending_cursor`, a végén elölről): eddig mindig a legrégebbi 500, így több mint 500 soha nem alkalmazható bejegyzés mögött egy később alkalmazhatóvá vált bejegyzés a megőrzési idő végéig kimaradt a vetületből és a jelentésből (FR-001, a WP-BE-018 regressziója).
+- A push `422 validation_failed`-del elutasítja azt a bejegyzést, amelynek `media` tömbjében ugyanaz a fotóazonosító kétszer szerepel, ahogy a `waypost/schema` 0.7.0 előírja (SCH-016); eddig elfogadta, és a második lenyomat elveszett (FR-003).
+
 ### Changed
 
+- A tesztek a `chain/test-vectors.json` `normalized` és `invalid` eseteit is futtatják, a push végponton át (FR-004).
 - A CI a `waypost/schema` 0.8.1-gyel fut (csak leírások: a WP-BE-001, WP-BE-003 és WP-BE-005 viselkedése a szerződésben, `docs/AUDIT-OTHER-REPOS.md` 1., 2. és 4. sor); a `^0.8` követelmény nem változik.
 
 ## [0.3.0] – 2026-11-05

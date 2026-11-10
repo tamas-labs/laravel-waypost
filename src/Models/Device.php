@@ -36,6 +36,7 @@ use Waypost\Models\Concerns\HasWaypostTokens;
  * @property Carbon|null $upload_closed_at  a revoked device has finished its last upload
  * @property int $last_seq
  * @property string|null $last_hash
+ * @property int $pending_cursor  the seq up to which the last push tried the unapplied entries of earlier pushes
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -61,6 +62,7 @@ final class Device extends Model implements AuthenticatableContract
             'last_seen_at' => 'datetime',
             'upload_closed_at' => 'datetime',
             'last_seq' => 'integer',
+            'pending_cursor' => 'integer',
         ];
     }
 

@@ -239,6 +239,38 @@ it('tries at most PENDING_LIMIT unapplied entries of earlier pushes, but always 
         ->and(Incident::query()->count())->toBe(count($earlier) + 1);
 });
 
+it('takes the unapplied entries of earlier pushes in turn, so ones that can never be applied do not hold back the later ones', function (): void {
+    $device = Device::factory()->create();
+    $chain = new ChainBuilder($device);
+    $neverShiftId = Uuid::v7();
+    $laterShiftId = Uuid::v7();
+    $earlier = [];
+    // More than PENDING_LIMIT entries waiting for a shift that never arrives, then one waiting for a shift that does.
+    foreach (range(1, ChainProcessor::PENDING_LIMIT + 1) as $seq) {
+        $earlier[] = $chain->incident($neverShiftId);
+    }
+    $earlier[] = $later = $chain->incident($laterShiftId);
+    foreach ($earlier as $data) {
+        ChainEntry::fromPush($data)->fill(['received_at' => Time::now(), 'verify_status' => VerifyStatus::Ok, 'flags' => []])->save();
+    }
+    $device->update(['last_seq' => $chain->seq, 'last_hash' => $chain->lastHash]);
+    Shift::factory()->create(['id' => $laterShiftId, 'device_id' => $device->id, 'chain_entry_id' => $earlier[0]['id']]);
+    $now = $chain->incident($neverShiftId);
+
+    pushAs($device, [$now])->assertOk();
+
+    // The first PENDING_LIMIT had their turn; the later one comes with the next push.
+    expect(ChainEntry::query()->whereKey($later['id'])->firstOrFail()->projected_at)->toBeNull()
+        ->and($device->refresh()->pending_cursor)->toBe(ChainProcessor::PENDING_LIMIT);
+
+    pushAs($device, [$now])->assertOk();
+
+    expect(ChainEntry::query()->whereKey($later['id'])->firstOrFail()->projected_at)->not->toBeNull()
+        ->and(ChainEntry::query()->whereNull('projected_at')->count())->toBe(ChainProcessor::PENDING_LIMIT + 2)
+        // Past the end it came round to the start: PENDING_LIMIT - 3 of the first ones were tried again.
+        ->and($device->refresh()->pending_cursor)->toBe(ChainProcessor::PENDING_LIMIT - 3);
+});
+
 it('lists at most MEDIA_MISSING_LIMIT missing photos, the oldest first', function (): void {
     $device = Device::factory()->create();
     $ids = [];
@@ -476,6 +508,26 @@ it('refuses a batch out of seq order as a whole', function (array $order): void 
     'the same seq twice' => [[0, 0]],
     'a later one out of place' => [[0, 2, 1]],
 ]);
+
+it('refuses an entry that lists a photo twice, whatever its hashes', function (): void {
+    $device = Device::factory()->create();
+    $chain = new ChainBuilder($device);
+    $photoId = Uuid::v7();
+    $first = $chain->scan(null, Uuid::v7());
+    $second = $chain->scan(null, Uuid::v7(), ['media' => [
+        ['id' => Uuid::v7(), 'sha256' => str_repeat('a', 64)],
+        ['id' => $photoId, 'sha256' => str_repeat('b', 64)],
+        ['id' => $photoId, 'sha256' => str_repeat('c', 64)],
+    ]]);
+
+    $response = pushAs($device, [$first, $second])->assertUnprocessable();
+
+    expect($response)->toMatchSchema('api/error');
+    expect($response->json('error.code'))->toBe('validation_failed')
+        ->and(array_keys($response->json('error.details')))->toBe(['entries.1.payload.media.2.id']);
+    expect(ChainEntry::query()->count())->toBe(0)
+        ->and(Media::query()->count())->toBe(0);
+});
 
 it('refuses more than 200 entries, and no entry at all', function (): void {
     $device = Device::factory()->create();

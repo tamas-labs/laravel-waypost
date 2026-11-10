@@ -3,18 +3,6 @@
 declare(strict_types=1);
 
 use Waypost\Chain\CanonicalJson;
-use Waypost\Schema\Paths;
-
-/**
- * chain/test-vectors.json of waypost/schema.
- *
- * @return array{key_base64: string, cases: list<array{name: string, input: array<string, mixed>, canonical_json: string, hash: string}>, chain: array{entries: list<array<string, mixed>>}}
- */
-function chainVectors(): array
-{
-    /** @var array{key_base64: string, cases: list<array{name: string, input: array<string, mixed>, canonical_json: string, hash: string}>, chain: array{entries: list<array<string, mixed>>}} */
-    return json_decode((string) file_get_contents(Paths::chainVectors()), true, flags: JSON_THROW_ON_ERROR);
-}
 
 it('writes the canonical JSON of every test vector', function (): void {
     $cases = chainVectors()['cases'];

@@ -66,7 +66,8 @@ final class SyncController extends Controller
     }
 
     /**
-     * The entries of the body: all of the calling device (the token's, api/sync-push.request.json), in ascending seq order.
+     * The entries of the body: all of the calling device (the token's, api/sync-push.request.json), in ascending seq order,
+     * each photo at most once in an entry's media (a rule the schema cannot express: waypost/schema decisions, SCH-016).
      *
      * @return list<array<string, mixed>>
      */
@@ -87,8 +88,37 @@ final class SyncController extends Controller
                 self::invalid("entries.{$index}.seq", 'A bejegyzéseknek seq szerint növekvő sorrendben kell lenniük.');
             }
             $previous = $entry['seq'];
+            $position = self::repeatedPhoto($entry);
+            if ($position !== null) {
+                self::invalid("entries.{$index}.payload.media.{$position}.id", 'Ez a fotó már szerepel a bejegyzésben.');
+            }
         }
 
         return $entries;
+    }
+
+    /**
+     * The position in the entry's media where a photo ID comes the second time: the chain would hold two hashes for
+     * one photo, and its upload would fail with one of them for good.
+     *
+     * @param  array<string, mixed>  $entry  chain/entry.json
+     */
+    private static function repeatedPhoto(array $entry): ?int
+    {
+        $payload = $entry['payload'];
+        $media = is_array($payload) && is_array($payload['media'] ?? null) ? $payload['media'] : [];
+        $seen = [];
+        foreach (array_values($media) as $position => $photo) {
+            $id = is_array($photo) ? $photo['id'] ?? null : null;
+            if (!is_string($id)) {
+                continue;
+            }
+            if (isset($seen[$id])) {
+                return $position;
+            }
+            $seen[$id] = true;
+        }
+
+        return null;
     }
 }

@@ -167,13 +167,13 @@ function callApi(string $method, string $path, User $supervisor, array $body = [
 
 /**
  * A request to the API (the path under the prefix) with the headers (call() ignores withHeaders()). A write request
- * gets a fresh Idempotency-Key unless the headers have one; an empty body is sent as {}.
+ * gets a fresh Idempotency-Key unless the headers have one; an empty body is sent as {}, a string as it is (raw JSON).
  *
  * @param  array<string, string>  $headers
- * @param  array<string, mixed>  $body
+ * @param  array<string, mixed>|string  $body
  * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
  */
-function requestApi(string $method, string $path, array $headers, array $body = []): TestResponse
+function requestApi(string $method, string $path, array $headers, array|string $body = []): TestResponse
 {
     if ($method !== 'GET' && !isset($headers['Idempotency-Key'])) {
         $headers['Idempotency-Key'] = (string) Str::uuid();
@@ -182,7 +182,11 @@ function requestApi(string $method, string $path, array $headers, array $body = 
     foreach ($headers as $name => $value) {
         $server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = $value;
     }
-    $content = $body === [] ? '{}' : json_encode($body, JSON_THROW_ON_ERROR);
+    $content = match (true) {
+        is_string($body) => $body,
+        $body === [] => '{}',
+        default => json_encode($body, JSON_THROW_ON_ERROR),
+    };
 
     return call($method, "api/waypost/v1/{$path}", server: $server, content: $content);
 }
@@ -341,4 +345,21 @@ function realJpegBytes(int $width = 640, int $height = 480, int $red = 200): str
     imagejpeg($image);
 
     return (string) ob_get_clean();
+}
+
+/**
+ * chain/test-vectors.json of waypost/schema.
+ *
+ * @return array{
+ *     key_base64: string,
+ *     cases: list<array{name: string, input: array<string, mixed>, canonical_json: string, hash: string}>,
+ *     chain: array{entries: list<array<string, mixed>>},
+ *     normalized: array{cases: list<array{name: string, entry_json: string, canonical_json: string, hash: string}>},
+ *     invalid: array{cases: list<array{name: string, expected: 'invalid'|'bad_hmac', entry_json: string}>},
+ * }
+ */
+function chainVectors(): array
+{
+    /** @var array{key_base64: string, cases: list<array{name: string, input: array<string, mixed>, canonical_json: string, hash: string}>, chain: array{entries: list<array<string, mixed>>}, normalized: array{cases: list<array{name: string, entry_json: string, canonical_json: string, hash: string}>}, invalid: array{cases: list<array{name: string, expected: 'invalid'|'bad_hmac', entry_json: string}>}} */
+    return json_decode((string) file_get_contents(Paths::chainVectors()), true, flags: JSON_THROW_ON_ERROR);
 }
