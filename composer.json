@@ -39,7 +39,7 @@
             "options": {
                 "symlink": true,
                 "versions": {
-                    "waypost/schema": "0.9.0"
+                    "waypost/schema": "0.9.1"
                 }
             }
         }

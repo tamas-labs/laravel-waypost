@@ -22,7 +22,9 @@ final class AuthController
      * address, a guard and a wrong password get the same answer.
      *
      * Also in the time it takes: without a password to check, the password is hashed instead, which costs as much as
-     * a check with the same hasher. Otherwise the quicker answer would tell which addresses have an account.
+     * a check with the same hasher. Otherwise the quicker answer would tell which addresses have an account. A hash
+     * made with older settings (e.g. fewer bcrypt rounds) is made again at the login, so that the stored hashes cost
+     * what a new one does (FR-015).
      *
      * @return array{token: string, user: array{id: string, name: string, email: string|null, role: string}}
      */
@@ -41,6 +43,11 @@ final class AuthController
         }
         if (!$user->active) {
             throw new ApiException(ErrorCode::Unauthenticated, 'Ez a fiók inaktív, nem lehet vele belépni.');
+        }
+
+        if (Hash::needsRehash($user->password)) {
+            // The model's hashed cast hashes the plain password with the current settings.
+            $user->forceFill(['password' => $password])->save();
         }
 
         $token = $user->createToken($request->string('device_name')->toString(), [Authenticate::SUPERVISOR]);

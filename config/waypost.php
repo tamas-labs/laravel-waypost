@@ -28,6 +28,14 @@ return [
     'log_channel' => env('WAYPOST_LOG_CHANNEL'),
 
     /*
+    | Days a supervisor's token may go unused before it stops working (401 unauthenticated; the app asks for the
+    | password again and keeps the phone's data and unsent actions). null: it never expires. A site phone's token
+    | has no such limit: a phone in a drawer must still upload its chain, and a lost one is replaced by a new
+    | enrollment at once.
+    */
+    'token_idle_days' => env('WAYPOST_TOKEN_IDLE_DAYS', 90),
+
+    /*
     | Rate limits of the API, in requests per minute: "api" per token owner (user or device), "login" per
     | e-mail address and IP address, "login_ip" per IP address (whatever the address tried; behind a proxy
     | the host's TrustProxies decides the IP), "pin" per token owner on the requests that give a PIN (each of them

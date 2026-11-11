@@ -56,6 +56,7 @@ A `config/waypost.php` beállításai környezeti változóval is megadhatók:
 | `WAYPOST_RATE_LIMIT` | `240` | kérés percenként, tokentulajdonosonként |
 | `WAYPOST_LOGIN_RATE_LIMIT` | `5` | belépési kísérlet percenként, ugyanarra az e-mail-címre ugyanarról az IP-címről |
 | `WAYPOST_LOGIN_IP_RATE_LIMIT` | `30` | belépési kísérlet percenként, IP-címenként, bármelyik e-mail-címre |
+| `WAYPOST_TOKEN_IDLE_DAYS` | `90` | ennyi nap használat nélkül a supervisor tokenje lejár (`401 unauthenticated`; az app újra kéri a jelszót, a telefon adatai megmaradnak); `null`: soha nem jár le. A telephelyi telefon tokenjére nem vonatkozik |
 | `WAYPOST_PIN_RATE_LIMIT` | `20` | PIN-t adó kérés (`POST /users`, `PUT /users/{id}/pin`, `POST /sites/{id}/users`) percenként, tokentulajdonosonként; mindegyik a telephelyek minden felhasználójára újraszámolja a PIN-t |
 | `WAYPOST_LOG_CHANNEL` | a gazda alapértelmezettje | a csomag naplócsatornája (elutasított láncbejegyzések, a hivatkozásukra váró bejegyzések, a félbemaradt vagy még futó `Idempotency-Key`, az újraküldött jelentés, az éjszakai takarítás) |
 | `WAYPOST_GUARD` | `waypost` | a csomag auth guardjának neve; ha a gazdának már van ilyen nevű guardja, az alkalmazás hibával áll le, és itt más nevet kell adni |
@@ -92,7 +93,7 @@ A kérések és válaszok pontos alakját a `waypost-schema` JSON Schemái rögz
   - supervisor: a `POST /auth/login` tokenjével;
   - telephelyi telefon: a `POST /devices/enroll` tokenjével;
   - supervisor a telephelyi telefonon: telefon tokennel és `X-Acting-User` fejléccel, a PIN-nel belépett supervisor azonosítójával.
-- **Tokenek:** a token a `Authorization: Bearer …` fejlécben megy. A visszavont telefon tokenje `401 device_revoked` választ kap.
+- **Tokenek:** a token a `Authorization: Bearer …` fejlécben megy. A visszavont telefon tokenje `401 device_revoked` választ kap. A supervisor tokenje 90 nap használat nélkül lejár (`WAYPOST_TOKEN_IDLE_DAYS`), utána `401 unauthenticated`; a telephelyi telefoné nem.
 - **Író kérések:** minden író kéréshez `Idempotency-Key` fejléc kell (UUID). Ugyanazzal a kulccsal megismételt kérésre a szerver 24 órán át ugyanazt a választ adja vissza, és nem hajtja végre újra.
 
 | Végpont | Hívó |

@@ -139,6 +139,38 @@ it('answers unauthenticated for an expired token', function (): void {
     expectError(callAs('supervisor', $token), 401, 'unauthenticated');
 });
 
+it('answers unauthenticated for a supervisor token unused for waypost.token_idle_days, counted from its last use', function (): void {
+    travelTo(Time::fromIso('2026-01-01T12:00:00.000Z'));
+    $site = Site::factory()->create();
+    $used = supervisorToken(supervisorOf($site));
+    $unused = supervisorToken(supervisorOf($site));
+    callAs('supervisor', $used)->assertOk();
+
+    // 89 days after the last use: still valid, and the use starts the 90 days again.
+    travelTo(Time::fromIso('2026-03-31T12:00:00.000Z'));
+    callAs('supervisor', $used)->assertOk();
+    travelTo(Time::fromIso('2026-06-28T11:59:59.999Z'));
+    callAs('supervisor', $used)->assertOk();
+
+    travelTo(Time::fromIso('2026-09-26T11:59:59.999Z'));
+    expectError(callAs('supervisor', $used), 401, 'unauthenticated');
+    // Never used: from when it was made.
+    expectError(callAs('supervisor', $unused), 401, 'unauthenticated');
+});
+
+it('keeps a site phone\'s token, and every token with token_idle_days null, however long unused', function (): void {
+    travelTo(Time::fromIso('2026-01-01T12:00:00.000Z'));
+    $device = Device::factory()->create();
+    $deviceToken = deviceToken($device);
+    $supervisor = supervisorToken(supervisorOf($device->site()->firstOrFail()));
+
+    travelTo(Time::fromIso('2027-01-01T12:00:00.000Z'));
+    callAs('device', $deviceToken)->assertOk();
+    expectError(callAs('supervisor', $supervisor), 401, 'unauthenticated');
+    config(['waypost.token_idle_days' => null]);
+    callAs('supervisor', $supervisor)->assertOk();
+});
+
 it('answers unauthenticated once the supervisor is inactive, deleted or no longer a supervisor', function (Closure $change): void {
     $user = User::factory()->supervisor()->create();
     $token = supervisorToken($user);

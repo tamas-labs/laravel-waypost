@@ -17,7 +17,7 @@ use Waypost\Support\Time;
 /**
  * The "waypost" guard: the owner of the bearer token in the package's own token table (Sanctum's guard would
  * look in the host application's table). A token is valid if it has not expired and its owner exists; a user's
- * only while they are an active supervisor. A revoked device's token stays valid here: the Authenticate
+ * only while they are an active supervisor, and used within the last waypost.token_idle_days days (FR-024). A revoked device's token stays valid here: the Authenticate
  * middleware answers device_revoked, except where the device may still upload (push-final).
  *
  * The result is kept on the request, not on the guard, so a long-lived guard never serves a previous request's
@@ -96,7 +96,7 @@ final readonly class TokenGuard implements Guard
 
         $owner = $token->tokenable;
         $valid = match (true) {
-            $owner instanceof User => $owner->active && $owner->role === Role::Supervisor,
+            $owner instanceof User => $owner->active && $owner->role === Role::Supervisor && !self::idle($token),
             $owner instanceof Device => true,
             default => false,
         };
@@ -108,6 +108,18 @@ final readonly class TokenGuard implements Guard
 
         /** @var User|Device $owner */
         return $owner->withAccessToken($token);
+    }
+
+    /** A supervisor token unused for longer than waypost.token_idle_days (never used: since it was made). */
+    private static function idle(PersonalAccessToken $token): bool
+    {
+        $days = config('waypost.token_idle_days');
+        if ($days === null || $days === '') {
+            return false;
+        }
+        $lastUse = $token->last_used_at ?? $token->created_at;
+
+        return $lastUse !== null && $lastUse->lessThanOrEqualTo(Time::now()->subDays((int) $days));
     }
 
     /** Records the use, at most once per LAST_USED_RESOLUTION_S, without updated_at. */

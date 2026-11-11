@@ -70,6 +70,14 @@ it('steps an interval across midnight and up to its end', function (): void {
     expect(Expansion::windowMinutes($schedule))->toBe([1320, 1365, 1410, 1455, 1500]);
 });
 
+it('leaves out the end of a window with the same start and end, the start of the next window, as the app (FR-019)', function (): void {
+    $allDay = ['mode' => 'interval', 'interval_from' => '20:00', 'interval_to' => '20:00', 'weekdays' => 127];
+
+    expect(Expansion::windowMinutes(scheduleOf([...$allDay, 'interval_every_min' => 360])))->toBe([1200, 1560, 1920, 2280])
+        ->and(Expansion::windowMinutes(scheduleOf([...$allDay, 'interval_every_min' => 1440])))->toBe([1200])
+        ->and(Expansion::expand(scheduleOf([...$allDay, 'interval_every_min' => 1440]), 'Europe/Budapest', '2026-11-03', '2026-11-05'))->toHaveCount(3);
+});
+
 it('rejects an incomplete interval and a date that does not exist', function (): void {
     $incomplete = scheduleOf(['id' => 'x', 'mode' => 'interval', 'interval_from' => '20:00', 'interval_to' => null, 'interval_every_min' => 60, 'weekdays' => 127]);
     $list = scheduleOf(['mode' => 'list', 'start_times' => ['20:00'], 'weekdays' => 127]);

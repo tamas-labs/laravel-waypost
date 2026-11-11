@@ -14,18 +14,21 @@ Egy új migráció (`devices.pending_cursor`) és új sémaverzió (`waypost/sch
 
 ### Fixed
 
+- Az egyenlő kezdetű és végű intervallum-menetrend (24 órás ablak) záró időpontja a következő ablak kezdete, ezért nem tartozik az ablakhoz, ahogy az app is számolja. Eddig a jelentés egy várt körrel többet számolt. Ilyen menetrendet a szerver nem fogad el, csak importból vagy kézi beírásból kerülhet az adatbázisba (FR-019).
 - A korábbi pushok alkalmazatlan bejegyzései sorban kerülnek újrapróbálásra (`devices.pending_cursor`, a végén elölről): eddig mindig a legrégebbi 500, így több mint 500 soha nem alkalmazható bejegyzés mögött egy később alkalmazhatóvá vált bejegyzés a megőrzési idő végéig kimaradt a vetületből és a jelentésből (FR-001, a WP-BE-018 regressziója).
 - A push `422 validation_failed`-del elutasítja azt a bejegyzést, amelynek `media` tömbjében ugyanaz a fotóazonosító kétszer szerepel, ahogy a `waypost/schema` 0.7.0 előírja (SCH-016); eddig elfogadta, és a második lenyomat elveszett (FR-003).
 
 ### Security
 
+- A supervisor tokenje 90 nap használat nélkül lejár (`waypost.token_idle_days`, `WAYPOST_TOKEN_IDLE_DAYS`; `null`: soha), utána `401 unauthenticated`. A telephelyi telefon tokenje nem jár le (FR-024, WP-BE-005).
+- A régebbi beállítással (pl. kevesebb bcrypt-körrel) készült jelszóhash belépéskor újra elkészül, így a tárolt hash ellenőrzése annyiba kerül, mint a fiók nélküli belépés hash-e, és a válaszidő továbbra sem árulja el a fiókot. Egy teszt a valódi hasherrel méri a két ág idejét (FR-015, WP-BE-012).
 - `production` környezetben a fotók és a PDF-ek aláírt linkje mindig `https://`, az `APP_URL` és a kérés sémájától függetlenül. A gazda saját URL-jei nem változnak; proxy mögött a `TrustProxies` kell, különben a link `403`-at ad (FR-006, SCH-020).
 - Az újraküldött jelentés naplóbejegyzése a már elért címzettek e-mail-címe helyett csak a számukat tartalmazza (`delivered_count`), a csomag naplózási szabálya szerint (FR-011).
 
 ### Changed
 
 - A tesztek a `chain/test-vectors.json` `normalized` és `invalid` eseteit is futtatják, a push végponton át (FR-004).
-- A `waypost/schema` követelménye `^0.9` (0.9.0; a 0.8.1 leírásai is: a WP-BE-001, WP-BE-003 és WP-BE-005 viselkedése a szerződésben, `docs/AUDIT-OTHER-REPOS.md` 1., 2. és 4. sor).
+- A `waypost/schema` követelménye `^0.9` (0.9.1; a 0.8.1 leírásai is: a WP-BE-001, WP-BE-003 és WP-BE-005 viselkedése a szerződésben, `docs/AUDIT-OTHER-REPOS.md` 1., 2. és 4. sor).
 
 ## [0.3.0] – 2026-11-05
 

@@ -93,6 +93,47 @@ it('hashes the password also when there is none to check, so that the time tells
     'supervisor without a password' => ['jelszo.nelkul@example.com'],
 ]);
 
+it('takes as long without an account as with a wrong password, with the real hasher (FR-015)', function (): void {
+    config(['hashing.bcrypt.rounds' => 10, 'waypost.rate_limits.login' => 100]);
+    Hash::forgetDrivers(); // the hasher keeps the rounds it was made with
+    supervisor();
+    $median = function (array $body): float {
+        $times = [];
+        for ($i = 0; $i < 5; $i++) {
+            $start = hrtime(true);
+            login([...$body, 'device_name' => 'Pixel 8'])->assertUnauthorized();
+            $times[] = hrtime(true) - $start;
+        }
+        sort($times);
+
+        return (float) $times[2];
+    };
+    $median(['email' => 'senki@example.com', 'password' => 'password']); // the first request warms up the framework
+
+    $wrongPassword = $median(['email' => 'nagy.anna@example.com', 'password' => 'wrong']);
+    $unknownAddress = $median(['email' => 'senki@example.com', 'password' => 'password']);
+
+    // A bcrypt of 10 rounds is tens of milliseconds; without the hash the unknown address would answer in a few.
+    expect($unknownAddress / $wrongPassword)->toBeGreaterThan(0.5)->toBeLessThan(2.0);
+});
+
+it('hashes the password again at the login if it was hashed with older settings', function (): void {
+    config(['hashing.bcrypt.rounds' => 4]);
+    Hash::forgetDrivers();
+    $old = supervisor()->password;
+    config(['hashing.bcrypt.rounds' => 5]);
+    Hash::forgetDrivers();
+
+    login(['email' => 'nagy.anna@example.com', 'password' => 'password', 'device_name' => 'Pixel 8'])->assertOk();
+
+    $stored = User::query()->where('email', 'nagy.anna@example.com')->sole()->password;
+    expect($stored)->not->toBe($old)
+        ->and(Hash::needsRehash((string) $stored))->toBeFalse()
+        ->and(Hash::check('password', (string) $stored))->toBeTrue();
+    login(['email' => 'nagy.anna@example.com', 'password' => 'password', 'device_name' => 'Pixel 8'])->assertOk();
+    expect(User::query()->where('email', 'nagy.anna@example.com')->sole()->password)->toBe($stored);
+});
+
 it('refuses an inactive supervisor with the right password', function (): void {
     supervisor()->update(['active' => false]);
 

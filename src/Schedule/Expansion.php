@@ -102,9 +102,13 @@ final class Expansion
             $to += self::MINUTES_PER_DAY;
         }
 
+        // The server refuses interval_to = interval_from (a window of 24 h); if one is stored anyway (an import, a manual
+        // edit), its end is the next day's start, which belongs to that day's window only: as the app counts it (FR-019).
+        $last = $to - $from === self::MINUTES_PER_DAY ? $to - 1 : $to;
+
         // Not range(): it throws if the step is longer than the window (e.g. every 1440 minutes).
         $minutes = [];
-        for ($minute = $from; $minute <= $to; $minute += $schedule->interval_every_min) {
+        for ($minute = $from; $minute <= $last; $minute += $schedule->interval_every_min) {
             $minutes[] = $minute;
         }
 
