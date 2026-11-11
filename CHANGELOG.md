@@ -6,7 +6,9 @@ A formátum a [Keep a Changelog](https://keepachangelog.com/hu/1.1.0/) ajánlás
 
 ## [Unreleased]
 
-Egy új migráció (`devices.pending_cursor`) és új sémaverzió (`waypost/schema` `^0.9`): frissítés `composer update waypost/laravel-waypost waypost/schema`, utána `php artisan waypost:install --migrate`.
+## [0.4.0] – 2026-11-11
+
+A 2026-11-09-i javításellenőrzés (`remediation-review/FIX-REVIEW-ISSUES.md`) backendet érintő tételei (FR-001, FR-003, FR-004, FR-006, FR-008, FR-011, FR-013, FR-015, FR-019, FR-024) és a `waypost/schema` 0.9.1. A supervisor tokenje mostantól 90 nap használat nélkül lejár (`WAYPOST_TOKEN_IDLE_DAYS`). Egy új migráció (`devices.pending_cursor`) és új sémaverzió (`waypost/schema` `^0.9`): frissítés `composer update waypost/laravel-waypost waypost/schema`, utána `php artisan waypost:install --migrate`.
 
 ### Added
 

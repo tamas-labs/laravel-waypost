@@ -31,6 +31,7 @@ const RELEASED_MIGRATIONS = [
     '2026_11_05_000018_add_waypost_foreign_key_indexes.php' => '63bdbec0010da57bbb7355b64f9d2a7aa917a136c677999e1174c52e96f75fb6',
     '2026_11_05_000019_add_waypost_reports_delivered_to.php' => '8e581b00fc6996672c75db0fb4314c1649c40db3877cc1436157eac887e4e9ac',
     '2026_11_05_000020_use_waypost_morph_aliases.php' => 'cc8b1f23959b5451467b1d9570c8363e7fbe9a135de68dd3786689c5100b9e13',
+    '2026_11_10_000021_add_waypost_devices_pending_cursor.php' => '41cea171d4400e1ad2993bf2c1b28ad789deb90ce62074a4a54d707992b44b1f',
 ];
 
 it('never changes a released migration', function (): void {
