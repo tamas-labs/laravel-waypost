@@ -160,7 +160,8 @@ final class ReportSender
         $delivered = $abandoned->delivered_to ?? [];
         Logger::channel()->warning('Waypost: a report claimed but not sent to everyone is sent again, to the rest; its previous attempt failed or died.', [
             'report_id' => $abandoned->id, 'site_id' => $site->id, 'type' => $type->value, 'generated_at' => Time::iso($abandoned->generated_at),
-            'delivered_to' => $delivered,
+            // How many, not who: no personal data in the log (the addresses stay in the claim).
+            'delivered_count' => count($delivered),
         ]);
         if ($abandoned->path !== null) {
             Storage::disk(config('waypost.storage.disk'))->delete($abandoned->path);

@@ -103,3 +103,18 @@ it('sends only to the rest after an attempt that died halfway', function (): voi
     expect(mailedAddresses())->toBe(['c@example.com'])
         ->and($report?->delivered_to)->toBe(['a@example.com', 'b@example.com', 'c@example.com']);
 });
+
+it('logs how many recipients an abandoned claim reached, not their addresses', function (): void {
+    $site = siteWithThreeRecipients();
+    $log = packageLog();
+    $claim = Report::factory()->create(['site_id' => $site->id, 'type' => ReportFrequency::Daily, 'period_start' => CarbonImmutable::parse('2026-11-02T23:00:00Z'),
+        'period_end' => CarbonImmutable::parse('2026-11-03T23:00:00Z'), 'generated_at' => CarbonImmutable::parse('2026-11-04T09:00:00Z'),
+        'delivered_to' => ['a@example.com', 'b@example.com']]);
+
+    travelTo(CarbonImmutable::parse('2026-11-04T09:15:00Z'));
+    sendDaily($site);
+
+    $log->shouldHaveReceived('warning')->once()->withArgs(fn (string $message, array $context): bool => str_contains($message, 'sent again')
+        && $context['report_id'] === $claim->id && $context['delivered_count'] === 2
+        && !str_contains(json_encode($context, JSON_THROW_ON_ERROR), '@'));
+});

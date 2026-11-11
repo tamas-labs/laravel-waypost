@@ -15,4 +15,9 @@ enum IncompleteReason: string
     case PendingRounds = 'pending_rounds';
     /** A photo of a scan or an incident has not been uploaded. */
     case MissingPhotos = 'missing_photos';
+    /**
+     * A phone reported that the server refused the first entry of its upload (validation_failed diagnostic), and the
+     * server has not taken that entry since: the chain cannot go past it, what came after it is still on the phone.
+     */
+    case UploadStalled = 'upload_stalled';
 }

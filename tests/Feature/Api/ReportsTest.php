@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\ReportFrequency;
 use Waypost\Http\SignedUrls;
@@ -155,6 +156,27 @@ it('refuses an expired or changed report link, and a file that is gone', functio
 
     travelTo(Time::now()->addMinutes(61));
     get($download['url'])->assertForbidden();
+});
+
+it('signs https links in production, also for a host on http, and leaves the host\'s own URLs alone', function (): void {
+    config()->set('app.url', 'http://waypost.test');
+    URL::forceRootUrl('http://waypost.test');
+    app()->detectEnvironment(fn (): string => 'production');
+    $site = Site::factory()->create();
+    $report = storedReport($site);
+    $photo = storedPhoto('2026-11-02T20:00:00.000Z');
+
+    $download = SignedUrls::report($report);
+    $photoUrl = SignedUrls::photo($photo, $site);
+
+    expect($download['url'] ?? null)->toStartWith('https://waypost.test/')
+        ->and($photoUrl)->toStartWith('https://waypost.test/')
+        ->and(URL::to('x'))->toBe('http://waypost.test/x');
+    assert($download !== null && $photoUrl !== null);
+    get($download['url'])->assertOk();
+    get((string) $photoUrl)->assertOk();
+    // Over http (a proxy ending TLS that the host does not trust) the URL is not the signed one.
+    get(str_replace('https://', 'http://', $download['url']))->assertForbidden();
 });
 
 it('keeps the retention of a cancelled subscription for that long after the cancellation', function (): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Waypost\Enums\ErrorCode;
 use Waypost\Enums\ChainEntryType;
 use Waypost\Enums\ChainFlag;
 use Waypost\Enums\IncidentCategory;
@@ -269,4 +270,25 @@ it('lists the flagged scans, the bad chain entries and what is still to come', f
 
     expect(summaryOf($fixture['site'], '2026-11-03', '2026-11-03', '2026-11-04T09:00:00.000Z')->incompleteReasons)
         ->toBe([IncompleteReason::PendingEntries, IncompleteReason::MissingPhotos]);
+});
+
+it('tells a stalled upload until the server takes the refused entry', function (): void {
+    $fixture = patrolledSite(['weekdays' => 127, 'start_times' => ['20:00'], 'time_limit_min' => 30]);
+    $phone = $fixture['phone'];
+    assert($phone instanceof Device);
+    $phone->update(['last_seen_at' => Time::fromIso('2026-11-04T06:00:00.000Z'), 'last_seq' => 40]);
+    // A chain refusal of the past (seq 12, long taken since) says nothing about the upload now.
+    DeviceDiagnostic::factory()->create(['device_id' => $phone->id, 'code' => ErrorCode::ValidationFailed, 'seq' => 12, 'expected_seq' => null,
+        'occurred_at' => Time::fromIso('2026-10-20T20:02:00.000Z')]);
+    DeviceDiagnostic::factory()->create(['device_id' => $phone->id, 'code' => ErrorCode::ChainFork, 'seq' => 45, 'expected_seq' => null]);
+    $summary = fn (): array => summaryOf($fixture['site'], '2026-11-03', '2026-11-03', '2026-11-04T09:00:00.000Z')->incompleteReasons;
+    expect($summary())->not->toContain(IncompleteReason::UploadStalled);
+
+    // Reported before the period: the entries of the period may be behind it all the same.
+    DeviceDiagnostic::factory()->create(['device_id' => $phone->id, 'code' => ErrorCode::ValidationFailed, 'seq' => 41, 'expected_seq' => null,
+        'occurred_at' => Time::fromIso('2026-11-01T20:02:00.000Z')]);
+    expect($summary())->toContain(IncompleteReason::UploadStalled);
+
+    $phone->update(['last_seq' => 41]);
+    expect($summary())->not->toContain(IncompleteReason::UploadStalled);
 });

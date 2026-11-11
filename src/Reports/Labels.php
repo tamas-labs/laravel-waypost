@@ -101,6 +101,7 @@ final class Labels
             IncompleteReason::PendingEntries => 'a telefon néhány bejegyzése még feldolgozásra vár',
             IncompleteReason::PendingRounds => 'egy kör lezárása még nem érkezett meg',
             IncompleteReason::MissingPhotos => 'néhány fotó még nem töltődött fel',
+            IncompleteReason::UploadStalled => 'a telefon feltöltése elakadt: a szerver nem fogadta el egy bejegyzését, az utána rögzített adatok a telefonon várnak',
         };
     }
 

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection as BaseCollection;
 use Waypost\Chain\TrustedTime;
+use Waypost\Enums\ErrorCode;
 use Waypost\Enums\MediaOwnerType;
 use Waypost\Enums\VerifyStatus;
 use Waypost\Models\ChainEntry;
@@ -308,6 +309,17 @@ final class Summarizer
             ->exists();
         if ($photosMissing) {
             $reasons[] = IncompleteReason::MissingPhotos;
+        }
+
+        // Until the server takes the refused entry (last_seq reaches it), whenever it was reported.
+        $lastSeqs = $devices->mapWithKeys(fn (Device $device): array => [$device->id => $device->last_seq]);
+        $stalled = DeviceDiagnostic::query()
+            ->whereIn('device_id', $devices->modelKeys())
+            ->where('code', ErrorCode::ValidationFailed->value)
+            ->get(['device_id', 'seq'])
+            ->contains(fn (DeviceDiagnostic $diagnostic): bool => $diagnostic->seq > ($lastSeqs[$diagnostic->device_id] ?? 0));
+        if ($stalled) {
+            $reasons[] = IncompleteReason::UploadStalled;
         }
 
         return $reasons;

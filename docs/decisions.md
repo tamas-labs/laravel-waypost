@@ -573,3 +573,29 @@ A közös szerződést (sémák, lánc, menetrend-kibontás) érintő döntések
   - Az esetek nevei adatkészletként jönnek a vektorfájlból: egy új vektor magától új tesztesetet ad. A `chainVectors()` ezért a `tests/Pest.php`-ba került.
 - **Indok:** A vektorok éppen azt bizonyítják, hogy a backend tényleges ellenőrzője úgy dönt, mint a szerződés referenciája (`scripts/chain-vectors.js`, `scripts/chain-php.sh`); a `CanonicalJson` és az `EntryHash` közvetlen hívása a dekódolást és a controllert kihagyná.
 - **Érintett:** `tests/Feature/Api/ChainVectorsTest.php`, `tests/Pest.php`, `tests/Unit/Chain/CanonicalJsonTest.php`, `src/Http/Controllers/SyncController.php` (FR-003).
+
+## 2026-11-11 – Élesben csak https-es aláírt link (FR-006)
+
+- **Kérdés:** Az `entities/report.json` `download.url` leírása (SCH-020) szerint a link `https`, és `http` csak akkor, ha maga az API is `http`-n fut (helyi fejlesztés, élesben soha). A minta `^https?://` maradt, és a backend semmit nem kényszerített: egy `http` `APP_URL`-lel futó gazda titkosítatlan, továbbítható letöltési linket adott ki. Hogyan kényszerítse a backend?
+- **Döntés:** A `SignedUrls` `production` környezetben a gazda URL-generátorának egy másolatával készíti a linkeket, `forceScheme('https')`-szel. A másolat új útvonal-generátort és sémagyorsítótárat kap (`setRequest()`), mert a lemásoltak az eredetié.
+  - A gazda saját URL-jei nem változnak: a globális `URL::forceScheme()` a gazda minden linkjét átírná.
+  - Az aláírás a teljes URL-t fedi, ezért egy `http`-n érkező kérés (a TLS-t bontó proxy, amelyben a gazda nem bízik meg) URL-je nem az aláírt, és `403`-at kap. Ez szándékos: a hibás beállítás látszik, nem csendben titkosítatlan.
+  - Más környezetben (`local`, `testing`, `staging` …) a link a kérés vagy az `APP_URL` sémáját követi, ahogy eddig.
+- **Nem választott:** induláskori figyelmeztetés a `http` `APP_URL`-re: a sorban futó jelentésküldés is linket ír, és a figyelmeztetés nem akadályozza meg a titkosítatlan linket. Middleware, amely élesben minden `http` kérést elutasít: a gazda proxybeállításától függ, és erre nincs hibakód a sémában.
+- **Érintett:** `src/Http/SignedUrls.php`, `tests/Feature/Api/ReportsTest.php`, README (*Üzemeltetés*).
+
+## 2026-11-11 – Az elakadt feltöltés a jelentésben (FR-013)
+
+- **Kérdés:** A `waypost/schema` 0.9.0 óta a telefon azt is jelenti (`POST /devices/diagnostics`, `code: validation_failed`), ha a push kötegének első bejegyzését a szerver `422`-vel elutasította. A lánc ilyenkor nem léphet tovább: amíg a szerver ezt a bejegyzést el nem fogadja, a telefon utána rögzített adatai nem érkeznek meg. Hogyan lássa ezt a supervisor?
+- **Döntés:** A jelentés „nem teljes adat” okai között új ok: `IncompleteReason::UploadStalled` („a telefon feltöltése elakadt: a szerver nem fogadta el egy bejegyzését, az utána rögzített adatok a telefonon várnak”). Akkor áll fenn, ha a telephely egy telefonjának van `validation_failed` diagnosztikája, amelynek `seq`-je nagyobb a telefon `last_seq`-jénél. A diagnosztika idejétől független: egy az időszak előtt elakadt feltöltés az időszak adatait is visszatartja. Amint a szerver elfogadja a bejegyzést (javított szerver vagy app), a `last_seq` eléri, és az ok eltűnik.
+  - A diagnosztika ezen felül, ahogy eddig, a „napló állapota” szakasz „elutasított bejegyzést jelzett” számába is beleszámít.
+  - Tárolás: a `device_diagnostics.code` szöveges oszlop az `ErrorCode` enummal, amelyben a `validation_failed` már szerepel; migráció nem kell.
+- **Érintett:** `src/Reports/IncompleteReason.php`, `Labels.php`, `Summarizer.php`, `tests/Feature/Reports/SummarizerTest.php`, `tests/Feature/Api/DeviceDiagnosticsTest.php`; a sémaverzió `.waypost-schema-version`, `composer.json`.
+
+## 2026-11-11 – Nincs feltöltéskori képméretkorlát (FR-008, `AUDIT-OTHER-REPOS.md` 5. sor)
+
+- **Kérdés:** Utasítsa-e el a `PUT /media/{id}` (`422`) a 4096 × 3072 képpontnál nagyobb képet (WP-BE-004)? Az app 1600 px-et küld.
+- **Döntés:** Nem; a tulajdonos döntése (2026-11-11). A fotó mérete miatt a szerver nem utasít el feltöltést. A backend továbbra is a jelentésnél véd: a túl nagy fotónak nincs bélyegképe (`Thumbnails`), a PDF memóriája így korlátos. A specifikáció `PUT /media/{id}` sora ezt kimondja; sémaváltozás nincs.
+- **Indok:** A láncban hivatkozott fotó elutasítása elveszítené a bizonyítékot, és a telefon a fotót újra és újra küldené. A fotót a lánc lenyomata (`sha256`) köti a bejegyzéshez, ezért a telefon nem cserélheti le egy kisebbre.
+- **Érintett:** `../waypost/docs/Waypost – fejlesztői specifikáció (1. lépcső).md` (*API-szerződés*), `docs/AUDIT-OTHER-REPOS.md`.
+

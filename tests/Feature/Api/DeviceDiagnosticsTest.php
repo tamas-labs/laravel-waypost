@@ -49,6 +49,15 @@ it('stores what the device reports', function (): void {
         ->and($stored->received_at)->not->toBeNull();
 });
 
+it('stores a refused upload (validation_failed), which has no expected_seq', function (): void {
+    $device = Device::factory()->create();
+
+    reportDiagnostic($device, ['code' => 'validation_failed', 'expected_seq' => null, 'rejected_count' => 1])->assertOk();
+
+    expect(DeviceDiagnostic::query()->sole()->code)->toBe(ErrorCode::ValidationFailed);
+    reportDiagnostic($device, ['code' => 'validation_failed', 'expected_seq' => 11])->assertUnprocessable();
+});
+
 it('changes nothing when the same report comes again, even with a new Idempotency-Key', function (): void {
     $device = Device::factory()->create();
     $id = Uuid::v7();
